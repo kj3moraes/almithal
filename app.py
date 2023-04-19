@@ -9,7 +9,9 @@ from streamlit_chat import message
 import openai
 from openai.embeddings_utils import get_embedding, distances_from_embeddings
 import os
-from dotenv import load_dotenv
+
+from transcription import Transcription, DownloadAudio
+from summary import Summarize
 
 # whisper
 model = whisper.load_model('base')
@@ -22,42 +24,45 @@ audio_file = ''
 
 array = []
 
+user_secret = os.getenv("OPENAI_API_KEY")
+
 # Sidebar
 with st.sidebar:
-    user_secret = st.text_input(label = ":blue[OpenAI API key]",
-                                value="",
-                                placeholder = "Paste your openAI API key, sk-",
-                                type = "password")
-    youtube_link = st.text_input(label = ":red[Youtube link]",
-                                value="https://youtu.be/rQeXGvFAJDQ",
+    youtube_link = st.text_input(label = ":white[Youtube link]",
                                 placeholder = "")
-    if youtube_link and user_secret:
+    st.markdown("OR")
+    pdf_file = st.file_uploader(label = ":white[PDF file]",
+                                type = "pdf")
+    if youtube_link:
         youtube_video = YouTube(youtube_link)
         video_id = pytube.extract.video_id(youtube_link)
         streams = youtube_video.streams.filter(only_audio=True)
         stream = streams.first()
+        
         if st.button("Start Analysis"):
-            if os.path.exists("word_embeddings.csv"):
-                os.remove("word_embeddings.csv")
+            te = Transcription(youtube_link)
+            
                 
             with st.spinner('Running process...'):
-                # Get the video mp4
-                mp4_video = stream.download(filename='youtube_video.mp4')
-                audio_file = open(mp4_video, 'rb')
-                st.write(youtube_video.title)
-                st.video(youtube_link) 
+                # # Get the video mp4
+                # mp4_video = stream.download(filename='youtube_video.mp4')
+                # audio_file = open(mp4_video, 'rb')
+                # st.write(youtube_video.title)
+                # st.video(youtube_link) 
 
-                # Whisper
-                output = model.transcribe("youtube_video.mp4")
+                # # Whisper
+                # output = model.transcribe("youtube_video.mp4")
                 
-                # Transcription
-                transcription = {
-                    "title": youtube_video.title.strip(),
-                    "transcription": output['text']
-                }
-                data_transcription.append(transcription)
+                # # Transcription
+                # transcription = {
+                #     "title": youtube_video.title.strip(),
+                #     "transcription": output['text']
+                # }
+                transcribed_data = te.transcribe()
+
+                data_transcription.append(transcribed_data)
                 pd.DataFrame(data_transcription).to_csv('transcription.csv') 
-                segments = output['segments']
+                segments = transcribed_data['segments']
     
                 #Embeddings
                 for segment in segments:
@@ -74,48 +79,33 @@ with st.sidebar:
                         "embedding": embeddings
                     }
                     data.append(meta)
-                # upsert_response = index.upsert(
-                #         vectors=data,
-                #         namespace=video_id
-                #     )
                 pd.DataFrame(data).to_csv('word_embeddings.csv') 
-                os.remove("youtube_video.mp4")
                 st.success('Analysis completed')
 
 st.markdown('# Almithal')
 
 DEFAULT_WIDTH = 80
-VIDEO_DATA = "https://youtu.be/bsFXgfbj8Bc"
 
 width = 40
 
 width = max(width, 0.01)
 side = max((100 - width) / 2, 0.01)
 
-_, container, _ = st.columns([side, 47, side])
-container.video(data=VIDEO_DATA)
-tab1, tab2, tab3, tab4 = st.tabs(["Introduciton", "Summary", "Transcription", "Q&A"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduciton", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
 with tab1:
     st.markdown("# How do I use this?")
 with tab2: 
-    st.header("Transcription:")
-    if(os.path.exists("youtube_video.mp4")):
-        audio_file = open('youtube_video.mp4', 'rb')
-        audio_bytes = audio_file.read()
-        st.audio(audio_bytes, format='audio/ogg')
-    if os.path.exists("transcription.csv"):
-        df = pd.read_csv('transcription.csv')
-        st.write(df)
+    st.header("Summary:")
 with tab3:
-    st.header("Embedding:")
+    st.header("Transcription")
+with tab4:
+    st.markdown("## Mind Map")
+with tab5:
+    st.header("Key Questions:")
     if os.path.exists("word_embeddings.csv"):
         df = pd.read_csv('word_embeddings.csv')
         st.write(df)
-with tab4:
-    user_secret = st.text_input(label = ":blue[OpenAI API key]",
-                                placeholder = "Paste your openAI API key, sk-",
-                                type = "password")
-    st.write('To obtain an API Key you must create an OpenAI account at the following link: https://openai.com/api/')
+with tab6:
     if 'generated' not in st.session_state:
         st.session_state['generated'] = []
 
