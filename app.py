@@ -41,29 +41,17 @@ with st.sidebar:
         
         if st.button("Start Analysis"):
             te = Transcription(youtube_link)
-            
-                
-            with st.spinner('Running process...'):
-                # # Get the video mp4
-                # mp4_video = stream.download(filename='youtube_video.mp4')
-                # audio_file = open(mp4_video, 'rb')
-                # st.write(youtube_video.title)
-                # st.video(youtube_link) 
+            YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
+            FOLDER_NAME = f"./tests/{YOUTUBE_VIDEO_ID}"
 
-                # # Whisper
-                # output = model.transcribe("youtube_video.mp4")
-                
-                # # Transcription
-                # transcription = {
-                #     "title": youtube_video.title.strip(),
-                #     "transcription": output['text']
-                # }
+            with st.spinner('Running process...'):
+                # # Get the video wav
                 transcribed_data = te.transcribe()
 
                 data_transcription.append(transcribed_data)
-                pd.DataFrame(data_transcription).to_csv('transcription.csv') 
+                pd.DataFrame(data_transcription).to_csv(f'{FOLDER_NAME}/transcription.csv') 
                 segments = transcribed_data['segments']
-                with open('segments.json', 'w') as f:
+                with open(f'{FOLDER_NAME}/segments.json', 'w') as f:
                     json.dump(segments, f, indent=4)
     
                 # Embeddings
@@ -81,27 +69,20 @@ with st.sidebar:
                         "embedding": embeddings
                     }
                     data.append(meta)
-                pd.DataFrame(data).to_csv('word_embeddings.csv') 
+                pd.DataFrame(data).to_csv(f'{FOLDER_NAME}/word_embeddings.csv') 
                 st.success('Analysis completed')
 
 st.markdown('# Almithal')
 
-DEFAULT_WIDTH = 80
-
-width = 40
-
-width = max(width, 0.01)
-side = max((100 - width) / 2, 0.01)
-
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduciton", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
 with tab1:
-    st.markdown("# How do I use this?")
+    st.header("How do I use this?")
 with tab2: 
     st.header("Summary:")
 with tab3:
     st.header("Transcription")
 with tab4:
-    st.markdown("## Mind Map")
+    st.header("Mind Map")
 with tab5:
     st.header("Key Questions:")
     if os.path.exists("word_embeddings.csv"):

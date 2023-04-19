@@ -107,7 +107,7 @@ class Transcription:
         self.datalink = datalink
         self.model = whisper.load_model('tiny')
         openai.api_key = os.environ.get("OPENAI_API_KEY")
-    
+        
     def transcribe(self) -> dict:
         """Returns the transcription of the PDF or youtube video as a string"""
 
@@ -170,6 +170,9 @@ class Transcription:
             chunk_transcription = self.model.transcribe(file_name)
             text_transcriptions += chunk_transcription["text"]
             segments.append(chunk_transcription["segments"])
+
+        # Flatten the segments 
+        segments = [segment for chunk in segments for segment in chunk]
 
         final_transcription = {
             "title:": audio_file.get_yt_title(),
