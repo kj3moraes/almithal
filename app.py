@@ -8,7 +8,7 @@ from pytube import YouTube
 from streamlit_chat import message
 import openai
 from openai.embeddings_utils import get_embedding, distances_from_embeddings
-import os
+import os, json
 
 from transcription import Transcription, DownloadAudio
 from summary import Summarize
@@ -63,8 +63,10 @@ with st.sidebar:
                 data_transcription.append(transcribed_data)
                 pd.DataFrame(data_transcription).to_csv('transcription.csv') 
                 segments = transcribed_data['segments']
+                with open('segments.json', 'w') as f:
+                    json.dump(segments, f, indent=4)
     
-                #Embeddings
+                # Embeddings
                 for segment in segments:
                     openai.api_key = user_secret
                     response = openai.Embedding.create(
