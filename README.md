@@ -1,29 +1,19 @@
-# README #
+# Almithal
 
-This README would normally document whatever steps are necessary to get your application up and running.
+This is a test for my youtube-gpt / pdf-gpt project. It is a streamlit app that allows you to get the summary, keytakeaways, and questions of a youtube video or a pdf file. You can then interact with the "file" by asking questions about it.
 
-### What is this repository for? ###
+## Prerequisites
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+To install all the prerequisites, run the following command:
 
-### How do I get set up? ###
+```bash
+    pip install -r requirements.txt
+```
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+## Runing the project
 
-### Contribution guidelines ###
+To run the project you need to have the prerequisites installed. Then run the following command:
 
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+```bash
+    streamlit run app.py
+```
