@@ -55,15 +55,16 @@ class DownloadAudio:
         # Check if the folder for the VIDEO_ID exists
         if not os.path.exists(pathname):
             os.mkdir(pathname)
-
-        # Download the .mp4 file
-        audiostream = self.yt.streams.filter(only_audio=True).first()
-        outfile_path = audiostream.download(pathname)
-
-        # Convert the .mp4 file to .wav
         FINAL_WAV_PATH = f"{pathname}/{self.WAV_FILE_NAME}"
-        wav_file = AudioFileClip(outfile_path)
-        wav_file.write_audiofile(FINAL_WAV_PATH, bitrate="16k", fps=16000)
+
+        if not os.path.exists(FINAL_WAV_PATH):
+            # Download the .mp4 file
+            audiostream = self.yt.streams.filter(only_audio=True).first()
+            outfile_path = audiostream.download(pathname)
+
+            # Convert the .mp4 file to .wav
+            wav_file = AudioFileClip(outfile_path)
+            wav_file.write_audiofile(FINAL_WAV_PATH, bitrate="16k", fps=16000)
 
         # Load the input .wav file
         audio = AudioSegment.from_wav(FINAL_WAV_PATH)
@@ -105,7 +106,7 @@ class Transcription:
 
     def __init__(self, datalink) -> None:
         self.datalink = datalink
-        self.model = whisper.load_model('tiny')
+        self.model = whisper.load_model('base')
         openai.api_key = os.environ.get("OPENAI_API_KEY")
         
     def transcribe(self) -> dict:
@@ -148,12 +149,13 @@ class Transcription:
 
 
     def get_text_from_link(self) -> dict:
-        # Get the audio file
-        audio_file = DownloadAudio(self.datalink)
 
         # Get the names of the stored wav files
         YOUTUBE_VIDEO_ID = self.datalink.split("=")[1]
         FOLDER_NAME = f"./tests/{YOUTUBE_VIDEO_ID}"
+
+        # Get the audio file
+        audio_file = DownloadAudio(self.datalink)
 
         # Get the names of the stored wav files
         file_names = audio_file.download(FOLDER_NAME)
@@ -167,7 +169,7 @@ class Transcription:
 
             # Get the transcription
             # We are guaranteed that this will be under the max size
-            chunk_transcription = self.model.transcribe(file_name)
+            chunk_transcription = self.model.transcribe(file_name, fp16=False)
             text_transcriptions += chunk_transcription["text"]
             segments.append(chunk_transcription["segments"])
 
@@ -175,7 +177,7 @@ class Transcription:
         segments = [segment for chunk in segments for segment in chunk]
 
         final_transcription = {
-            "title:": audio_file.get_yt_title(),
+            "title": audio_file.get_yt_title(),
             "transcription": text_transcriptions,
             "segments": segments
         }

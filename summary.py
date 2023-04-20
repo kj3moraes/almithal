@@ -1,27 +1,57 @@
-import openai
-import os
+import bentoml
+import torch
+from transformers import T5ForConditionalGeneration, T5Tokenizer
 
-class Summarize:
-    def __init__(self) -> None:
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+import nltk
 
-    def get_summary(self, transcript_list: list[str]) -> list[str]:
-        PREFIX = "Summarize the following passage:"
-        
-        summaries = []
-        for text in transcript_list:
-            response = openai.Completion.create(
-                engine="text-ada-001",
-                prompt=PREFIX + text,
-                temperature=0.4,
-                max_tokens=300,
-                top_p=1,
-                frequency_penalty=0.0,
-                presence_penalty=0.6,
-            )
+nltk.download("punkt")
+from nltk.tokenize import sent_tokenize
 
-            summaries.append(response.choices[0].text.strip())
 
-        final_summary = "".join(summaries).strip().replace("  ", " ").replace("\n", " ")
+class TextSummarizer(bentoml.Runnable):
+    SUPPORTS_CPU_MULTI_THREADING = True
+    SUPPORTED_RESOURCES = ("nvidia.com/gpu", "cpu")
 
-        return final_summary
+    def __init__(self):
+        self.model = T5ForConditionalGeneration.from_pretrained("t5-base")
+        self.tokenizer = T5Tokenizer.from_pretrained("t5-base")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.max_len = 512
+        self.model.to(self.device)
+
+    @staticmethod
+    def postprocesstext(content):
+        final = ""
+        for sent in sent_tokenize(content):
+            sent = sent.capitalize()
+            final = final + " " + sent
+        return final
+
+    @bentoml.Runnable.method(batchable=False)
+    def summarize(self, text):
+        encoding = self.tokenizer.encode_plus(
+            text,
+            max_length=self.max_len,
+            pad_to_max_length=False,
+            truncation=True,
+            return_tensors="pt",
+        ).to(self.device)
+
+        input_ids, attention_mask = encoding["input_ids"], encoding["attention_mask"]
+
+        outs = self.model.generate(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            early_stopping=True,
+            num_beams=3,
+            num_return_sequences=1,
+            no_repeat_ngram_size=2,
+            min_length=75,
+            max_length=300,
+        )
+
+        dec = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in outs]
+        summary = dec[0]
+        summary = TextSummarizer.postprocesstext(summary)
+        output = {"summary": summary}
+        return output

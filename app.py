@@ -11,16 +11,18 @@ from openai.embeddings_utils import get_embedding, distances_from_embeddings
 import os, json
 
 from transcription import Transcription, DownloadAudio
-from summary import Summarize
+from summary import TextSummarizer
 
 # whisper
 model = whisper.load_model('base')
 output = ''
 data = []
-data_transcription = []
+data_transcription = {"transcription":"base value"}
 embeddings = []
 mp4_video = ''
 audio_file = ''
+folder_name = "./tests/"
+input_accepted = False
 
 array = []
 
@@ -34,60 +36,77 @@ with st.sidebar:
     pdf_file = st.file_uploader(label = ":white[PDF file]",
                                 type = "pdf")
     if youtube_link:
-        youtube_video = YouTube(youtube_link)
-        video_id = pytube.extract.video_id(youtube_link)
-        streams = youtube_video.streams.filter(only_audio=True)
-        stream = streams.first()
+        input_accepted = True
+        te = Transcription(youtube_link)
+        YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
+        folder_name = f"./tests/{YOUTUBE_VIDEO_ID}"
         
         if st.button("Start Analysis"):
-            te = Transcription(youtube_link)
-            YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
-            FOLDER_NAME = f"./tests/{YOUTUBE_VIDEO_ID}"
-
             with st.spinner('Running process...'):
-                # # Get the video wav
-                transcribed_data = te.transcribe()
+                
+                if not os.path.exists(f'{folder_name}/data_transcription.json'):
+                    # Get the video wav
+                    data_transcription = te.transcribe()
 
-                data_transcription.append(transcribed_data)
-                pd.DataFrame(data_transcription).to_csv(f'{FOLDER_NAME}/transcription.csv') 
-                segments = transcribed_data['segments']
-                with open(f'{FOLDER_NAME}/segments.json', 'w') as f:
-                    json.dump(segments, f, indent=4)
-    
+                    with open(f"{folder_name}/data_transcription.json", "w") as f:
+                        json.dump(data_transcription, f, indent=4)
+                else:
+                    with open(f"{folder_name}/data_transcription.json", "r") as f:
+                        data_transcription = json.load(f)
+                    print(data_transcription["title"])
+                    
+                segments = data_transcription['segments']
+                
                 # Embeddings
-                for segment in segments:
-                    openai.api_key = user_secret
-                    response = openai.Embedding.create(
-                        input= segment["text"].strip(),
-                        model="text-embedding-ada-002"
-                    )
-                    embeddings = response['data'][0]['embedding']
-                    meta = {
-                        "text": segment["text"].strip(),
-                        "start": segment['start'],
-                        "end": segment['end'],
-                        "embedding": embeddings
-                    }
-                    data.append(meta)
-                pd.DataFrame(data).to_csv(f'{FOLDER_NAME}/word_embeddings.csv') 
-                st.success('Analysis completed')
+                if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
+                    for segment in segments:
+                        openai.api_key = user_secret
+                        response = openai.Embedding.create(
+                            input= segment["text"].strip(),
+                            model="text-embedding-ada-002"
+                        )
+                        embeddings = response['data'][0]['embedding']
+                        meta = {
+                            "text": segment["text"].strip(),
+                            "start": segment['start'],
+                            "end": segment['end'],
+                            "embedding": embeddings
+                        }
+                        data.append(meta)
+                    pd.DataFrame(data).to_csv(f'{folder_name}/word_embeddings.csv') 
+                    st.success('Analysis completed')
+                else:   
+                    data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
+                    print(data.head(5))
+                    embeddings = data.loc[:,"embeddings"]
+                    print(embeddings)
 
 st.markdown('# Almithal')
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduciton", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
 with tab1:
     st.header("How do I use this?")
 with tab2: 
-    st.header("Summary:")
+    if input_accepted:
+        st.header("Summary:")
+        text_transcription = data_transcription['transcription']
+        print("Working on summarization")
+        se = TextSummarizer()
+        summary = se.summarize(text_transcription)
+        st.write(summary["summary"])
+
 with tab3:
-    st.header("Transcription")
+    if input_accepted:
+        st.header("Transcription")
+        st.write(data_transcription["transcription"])
 with tab4:
     st.header("Mind Map")
 with tab5:
     st.header("Key Questions:")
-    if os.path.exists("word_embeddings.csv"):
-        df = pd.read_csv('word_embeddings.csv')
+    if os.path.exists(f"{folder_name}/word_embeddings.csv"):
+        df = pd.read_csv(f'{folder_name}/word_embeddings.csv')
         st.write(df)
+
 with tab6:
     if 'generated' not in st.session_state:
         st.session_state['generated'] = []
@@ -109,7 +128,7 @@ with tab6:
             model="text-embedding-ada-002"
         )
         q_embedding = response['data'][0]['embedding']
-        df=pd.read_csv('word_embeddings.csv', index_col=0)
+        df=pd.read_csv(f'{folder_name}/word_embeddings.csv', index_col=0)
         df['embedding'] = df['embedding'].apply(eval).apply(np.array)
 
         df['distances'] = distances_from_embeddings(q_embedding, df['embedding'].values, distance_metric='cosine')
@@ -142,7 +161,7 @@ with tab6:
 
     if user_input:
         text_embedding = get_embedding_text(user_secret, user_input)
-        title = pd.read_csv('transcription.csv')['title']
+        title = pd.read_csv(f'{folder_name}/data_transcription.json')['title']
         string_title = "\n\n###\n\n".join(title)
         user_input_embedding = 'Using this context: "'+string_title+'. '+text_embedding+'", answer the following question. \n'+user_input
         # st.write(user_input_embedding)
@@ -153,4 +172,3 @@ with tab6:
         for i in range(len(st.session_state['generated'])-1, -1, -1):
             message(st.session_state["generated"][i], key=str(i))
             message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
-
