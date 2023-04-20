@@ -37,11 +37,13 @@ edges = []
 
 nodes.append( Node(id="spiderman", 
                    label="Peter Parker", 
+                   size=15
                    ) 
             ) # includes **kwargs
 nodes.append( Node(id="captain_marvel", 
                    label="Captain Marvel",
-                  ) 
+                   size=15
+                    ) 
             )
 edges.append( Edge(source="captain_marvel", 
                    label="friend_of", 
