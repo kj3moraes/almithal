@@ -24,7 +24,6 @@ click-option-group==0.5.5
 cloudpickle==2.2.1
 cmake==3.26.3
 colorama==0.4.4
-command-not-found==0.3
 configobj==5.0.6
 constantly==15.1.0
 contextlib2==21.6.0
