@@ -8,7 +8,7 @@ from pydub.utils import make_chunks
 import PyPDF2
 
 # For transcription
-import openai, whisper
+import openai, whisper, torch
 
 # For other stuff
 import os, re
@@ -107,6 +107,8 @@ class Transcription:
     def __init__(self, datalink) -> None:
         self.datalink = datalink
         self.model = whisper.load_model('base')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
         openai.api_key = os.environ.get("OPENAI_API_KEY")
         
     def transcribe(self) -> dict:

@@ -73,24 +73,35 @@ with st.sidebar:
                         }
                         data.append(meta)
                     pd.DataFrame(data).to_csv(f'{folder_name}/word_embeddings.csv') 
-                    st.success('Analysis completed')
                 else:   
                     data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
                     embeddings = data["embedding"]
-
+                    
+                st.success('Analysis completed')
+                
+# Define the purpose of the application
 st.header('Almithal')
+st.subheader('Almithal is a comprhensive video and PDF study buddy.')
+st.write('It provides a summary, transcription, key insights, a mind map and a Q&A feature where you can actually "talk" to the datasource.')
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
 with tab1:
-    st.header("How do I use this?")
+    st.markdown("## How do I use this?")
+    st.markdown("Do one of the following")
+    st.markdown('* Type in your youtube URL that you want worked on')
+    st.markdown('* Place the PDF file that you want worked on')
+    
+    st.subheader("NOTE: This is just a demo product in alpha testing. Any and all bugs will soon to fixed")
 with tab2: 
     if input_accepted:
         st.header("Summary:")
-        text_transcription = data_transcription['transcription']
-        print("Working on summarization")
-        se = TextSummarizer()
-        summary = se.summarize(text_transcription)
-        st.write(summary["summary"])
+        with st.spinner("Generating summary ...."):
+            text_transcription = data_transcription['transcription']
+            print("Working on summarization")
+            se = TextSummarizer()
+            summary = se.summarize(text_transcription)
+            st.write(summary["summary"])
+
 
 with tab3:
     if input_accepted:
