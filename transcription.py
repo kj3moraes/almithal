@@ -146,7 +146,7 @@ class VideoTranscription:
             # Get the transcription
             # We are guaranteed that this will be under the max size
             chunk_transcription = self.model.transcribe(file_name, fp16=False)
-            text_transcriptions += chunk_transcription["text"]
+            text_transcriptions += chunk_transcription["text"].replace("$", "\$")
             segments.append(chunk_transcription["segments"])
 
         # Flatten the segments 

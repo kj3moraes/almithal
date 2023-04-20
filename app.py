@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_agraph import agraph, Node, Edge, Config
 
 import pandas as pd
 import numpy as np
@@ -7,23 +8,49 @@ from streamlit_chat import message
 import openai
 from openai.embeddings_utils import distances_from_embeddings
 import os, json
-from io import StringIO
 import math
 
 from transcription import *
 from summary import TextSummarizer
+import models as md
 
 # whisper
 model = whisper.load_model('base')
 output = ''
 data = []
-data_transcription = {"transcription":""}
+data_transcription = {"title":"", "text":""}
 embeddings = []
 audio_file = ''
 folder_name = "./tests/"
 input_accepted = False
 
-array = []
+config = Config(height=500,
+                width=700, 
+                nodeHighlightBehavior=True,
+                highlightColor="#F7A7A6", 
+                directed=True, 
+                collapsible=True)
+
+nodes = []
+edges = []
+
+nodes.append( Node(id="Spiderman", 
+                   label="Peter Parker", 
+                   size=25, 
+                   shape="circularImage",
+                   image="http://marvel-force-chart.surge.sh/marvel_force_chart_img/top_spiderman.png") 
+            ) # includes **kwargs
+nodes.append( Node(id="Captain Marvel", 
+                   size=25,
+                   shape="circularImage",
+                   image="http://marvel-force-chart.surge.sh/marvel_force_chart_img/top_captainmarvel.png") 
+            )
+edges.append( Edge(source="Captain Marvel", 
+                   label="friend_of", 
+                   target="Spiderman", 
+                   # **kwargs
+                   ) 
+            )
 
 user_secret = os.getenv("OPENAI_API_KEY")
 
@@ -101,11 +128,13 @@ with st.sidebar:
                     data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
                     embeddings = data["embedding"]
                 bar.progress(100)
-                st.success('Analysis completed')
+                st.success('Analysis completed')  
+                
     # PDF Transcription 
     elif pdf_file is not None:
         pte = PDFTranscription(pdf_file.name)
-        folder_name = f"./tests/{pdf_file.name}"
+        folder_name = f"./tests/{pdf_file.name}".replace(' ', '')
+        
         if st.button("Start Analysis"):
             with st.spinner('Running process...'):
                 
@@ -142,7 +171,24 @@ with st.sidebar:
                     data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
                     embeddings = data["embedding"]
                 bar.progress(100)
-                st.success('Analysis completed')                
+                st.success('Analysis completed')  
+
+
+text_df = pd.DataFrame.from_dict({"title": [data_transcription["title"]], "text":[data_transcription["text"]]})
+                
+with st.spinner('Breaking up text into more reasonable chunks (transformers cannot exceed a 1024 token max)...'):
+    # For each body of text, create text chunks of a certain token size required for the transformer
+    text_chunks_lib = dict()
+    for i in range(0, len(text_df)):
+        nested_sentences = md.create_nest_sentences(document=text_df['text'][i], token_max_length=1024)
+        # For each chunk of sentences (within the token max)
+        text_chunks = []
+        for n in range(0, len(nested_sentences)):
+            tc = " ".join(map(str, nested_sentences[n]))
+            text_chunks.append(tc)
+        title_entry = text_df['title'][i]
+        text_chunks_lib[title_entry] = text_chunks
+
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
 
@@ -152,10 +198,8 @@ with tab1:
     st.markdown("Do one of the following")
     st.markdown('* Type in your youtube URL that you want worked on')
     st.markdown('* Place the PDF file that you want worked on')
-    
     st.markdown("**Once the file / url has finished saving, a 'Start Analysis' button will appear. Click on this button to begin the note generation**")
-    
-    st.markdown("#### NOTE: This is just a demo product in alpha testing. Any and all bugs will soon be fixed")
+    st.warning("NOTE: This is just a demo product in alpha testing. Any and all bugs will soon be fixed")
 
 # =========== SUMMARIZATION ===========
 with tab2: 
@@ -163,26 +207,34 @@ with tab2:
     if input_accepted:
         if gen_summary == 'Yes':
             with st.spinner("Generating summary ...."):
-                text_transcription = data_transcription['transcription']
-                print("Working on summarization")
-                se = TextSummarizer()
-                summary = se.summarize(text_transcription)
-                st.write(summary["summary"])
+                # text_transcription = data_transcription['text']
+                # print("Working on summarization")
+                # se = TextSummarizer()
+                # summary = se.summarize(text_chunks_lib)
+                st.write("smmary daone")
         else:
             st.warning("Summary was not selected")
 
 # =========== TRANSCRIPTION ===========
 with tab3:
     if input_accepted:
+        st.header("Transcription")
         if gen_transcript == 'Yes':
-            st.header("Transcription")
-            st.markdown(data_transcription["transcription"])
+            with st.spinner("Generating transcript ..."):
+                for text in text_chunks_lib[title_entry]:
+                    st.write(text)
         else:
             st.warning("Transcription was not selected")
+    else:
+        st.error("You need to give a data source")
 
 # =========== MIND MAP ===========
 with tab4:
     st.header("Mind Map")
+    
+    return_value = agraph(nodes=nodes, 
+                        edges=edges, 
+                        config=config)
 
 # =========== KEY QUESTIONS ===========
 with tab5:
