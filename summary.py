@@ -5,20 +5,39 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer
 import models as md
 import nltk
 
+import openai
+import os
+
 nltk.download("punkt")
-from nltk.tokenize import sent_tokenize
 
-
-class TextSummarizer(bentoml.Runnable):
+class TextSummarizer:
     
     def __init__(self, title):
         self.title = title
+        self.model = "gpt-3.5-turbo"
         self.summarizer = md.load_summary_model()
+        openai.api_key = os.environ.get("OPENAI_API_KEY")
         
     def generate_short_summary(self, text_chunks_libs:pd.DataFrame) -> str:
         PROMPT = """
-        You are a as ad .
+         You are a helpful assistant that summarizes youtube videos.
+        Someone has already summarized the video to key points.
+        Summarize the key points to one or two sentences that capture the essence of the video.
         """
+        
+        final_summary = ""
+        for _, key in enumerate(text_chunks_libs):
+            for _, text_chunk in enumerate(text_chunks_libs[key]):
+                response = openai.ChatCompletion.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": PROMPT},
+                        {"role": "user", "content": text_chunk},
+                    ],
+                )
+                summary = response["choices"][0]["message"]["content"]
+                final_summary += "\n" + summary
+                
         
     def generate_full_summary(self, text_chunks_lib:dict) -> str:
         sum_dict = dict()

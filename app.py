@@ -37,20 +37,15 @@ edges = []
 
 nodes.append( Node(id="spiderman", 
                    label="Peter Parker", 
-                   size=25, 
-                   shape="circularImage",
-                   image="http://marvel-force-chart.surge.sh/marvel_force_chart_img/top_spiderman.png") 
+                   ) 
             ) # includes **kwargs
 nodes.append( Node(id="captain_marvel", 
                    label="Captain Marvel",
-                   size=25,
-                   shape="circularImage",
-                   image="http://marvel-force-chart.surge.sh/marvel_force_chart_img/top_captainmarvel.png") 
+                  ) 
             )
 edges.append( Edge(source="captain_marvel", 
                    label="friend_of", 
                    target="spiderman", 
-                   # **kwargs
                    ) 
             )
 
@@ -214,7 +209,7 @@ with tab2:
     st.header("TL;DR")
     if input_accepted:
         if gen_summary == 'Yes':
-            with st.spinner("Generating summary ...."):
+            with st.spinner("Generating TLDR ...."):
                 text_transcription = data_transcription['text']
                 print("Working on summarization")
                 tldr = se.generate_short_summary(text_chunks_lib)
