@@ -3,23 +3,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import whisper
-import pytube
-from pytube import YouTube
 from streamlit_chat import message
 import openai
-from openai.embeddings_utils import get_embedding, distances_from_embeddings
+from openai.embeddings_utils import distances_from_embeddings
 import os, json
+from io import StringIO
+import math
 
-from transcription import Transcription, DownloadAudio
+from transcription import Transcription
 from summary import TextSummarizer
 
 # whisper
 model = whisper.load_model('base')
 output = ''
 data = []
-data_transcription = {"transcription":"base value"}
+data_transcription = {"transcription":""}
 embeddings = []
-mp4_video = ''
 audio_file = ''
 folder_name = "./tests/"
 input_accepted = False
@@ -28,13 +27,36 @@ array = []
 
 user_secret = os.getenv("OPENAI_API_KEY")
 
-# Sidebar
+# Define the purpose of the application
+st.header('Almithal')
+st.subheader('Almithal is a comprhensive video and PDF study buddy.')
+st.write('It provides a summary, transcription, key insights, a mind map and a Q&A feature where you can actually "talk" to the datasource.')
+
+bar = st.progress(0)
+
+# =========== SIDEBAR FOR GENERATION ===========
 with st.sidebar:
     youtube_link = st.text_input(label = ":white[Youtube link]",
                                 placeholder = "")
     st.markdown("OR")
     pdf_file = st.file_uploader(label = ":white[PDF file]",
                                 type = "pdf")
+    
+    gen_keywords = st.radio(
+        "Generate keywords from text?",
+        ('Yes', 'No')
+    )
+    
+    gen_transcript = st.radio(
+        "Generate transcript ?",
+        ('Yes', 'No')
+    )
+
+    gen_summary = st.radio(
+        "Generate summary from text? (recommended for label matching below, but will take longer)",
+        ('Yes', 'No')
+    )
+    
     if youtube_link:
         input_accepted = True
         te = Transcription(youtube_link)
@@ -56,9 +78,10 @@ with st.sidebar:
                     
                 segments = data_transcription['segments']
                 
-                # Embeddings
+                # Generate embeddings
                 if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
-                    for segment in segments:
+                    for i, segment in enumerate(segments):
+                        bar.progress(max(math.ceil((i/len(segments) * 100)), 1))
                         openai.api_key = user_secret
                         response = openai.Embedding.create(
                             input= segment["text"].strip(),
@@ -72,47 +95,64 @@ with st.sidebar:
                             "embedding": embeddings
                         }
                         data.append(meta)
+                    
                     pd.DataFrame(data).to_csv(f'{folder_name}/word_embeddings.csv') 
                 else:   
                     data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
                     embeddings = data["embedding"]
-                    
+                bar.progress(100)
                 st.success('Analysis completed')
+    elif pdf_file is not None:
+        bytes_data = pdf_file.getvalue()
+        stringio = StringIO(pdf_file.getvalue().decode("utf-8"))
+        pdf_transcription = stringio.read()
                 
-# Define the purpose of the application
-st.header('Almithal')
-st.subheader('Almithal is a comprhensive video and PDF study buddy.')
-st.write('It provides a summary, transcription, key insights, a mind map and a Q&A feature where you can actually "talk" to the datasource.')
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
+
+# =========== INTRODUCTION ===========
 with tab1:
     st.markdown("## How do I use this?")
     st.markdown("Do one of the following")
     st.markdown('* Type in your youtube URL that you want worked on')
     st.markdown('* Place the PDF file that you want worked on')
     
-    st.subheader("NOTE: This is just a demo product in alpha testing. Any and all bugs will soon to fixed")
+    st.markdown("**Once the file / url has finished saving, a 'Start Analysis' button will appear. Click on this button to begin the note generation**")
+    
+    st.markdown("#### NOTE: This is just a demo product in alpha testing. Any and all bugs will soon be fixed")
+
+# =========== SUMMARIZATION ===========
 with tab2: 
+    st.header("Summary")
     if input_accepted:
-        st.header("Summary:")
-        with st.spinner("Generating summary ...."):
-            text_transcription = data_transcription['transcription']
-            print("Working on summarization")
-            se = TextSummarizer()
-            summary = se.summarize(text_transcription)
-            st.write(summary["summary"])
+        if gen_summary == 'Yes':
+            with st.spinner("Generating summary ...."):
+                text_transcription = data_transcription['transcription']
+                print("Working on summarization")
+                se = TextSummarizer()
+                summary = se.summarize(text_transcription)
+                st.write(summary["summary"])
+        else:
+            st.warning("Summary was not selected")
 
-
+# =========== TRANSCRIPTION ===========
 with tab3:
     if input_accepted:
-        st.header("Transcription")
-        st.write(data_transcription["transcription"])
+        if gen_transcript == 'Yes':
+            st.header("Transcription")
+            st.markdown(data_transcription["transcription"])
+        else:
+            st.warning("Transcription was not selected")
+
+# =========== MIND MAP ===========
 with tab4:
     st.header("Mind Map")
+
+# =========== KEY QUESTIONS ===========
 with tab5:
     st.header("Key Questions:")
     
-
+# =========== QUERY BOT ===========
 with tab6:
     if 'generated' not in st.session_state:
         st.session_state['generated'] = []
@@ -179,3 +219,4 @@ with tab6:
         for i in range(len(st.session_state['generated'])-1, -1, -1):
             message(st.session_state["generated"][i], key=str(i))
             message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
+            
