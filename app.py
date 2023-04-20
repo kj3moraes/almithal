@@ -10,7 +10,7 @@ import os, json
 from io import StringIO
 import math
 
-from transcription import Transcription
+from transcription import *
 from summary import TextSummarizer
 
 # whisper
@@ -59,7 +59,7 @@ with st.sidebar:
     
     if youtube_link:
         input_accepted = True
-        te = Transcription(youtube_link)
+        vte = VideoTranscription(youtube_link)
         YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
         folder_name = f"./tests/{YOUTUBE_VIDEO_ID}"
         
@@ -68,7 +68,7 @@ with st.sidebar:
                 
                 if not os.path.exists(f'{folder_name}/data_transcription.json'):
                     # Get the video wav
-                    data_transcription = te.transcribe()
+                    data_transcription = vte.transcribe()
 
                     with open(f"{folder_name}/data_transcription.json", "w") as f:
                         json.dump(data_transcription, f, indent=4)
@@ -102,11 +102,47 @@ with st.sidebar:
                     embeddings = data["embedding"]
                 bar.progress(100)
                 st.success('Analysis completed')
+    # PDF Transcription 
     elif pdf_file is not None:
-        bytes_data = pdf_file.getvalue()
-        stringio = StringIO(pdf_file.getvalue().decode("utf-8"))
-        pdf_transcription = stringio.read()
+        pte = PDFTranscription(pdf_file.name)
+        folder_name = f"./tests/{pdf_file.name}"
+        if st.button("Start Analysis"):
+            with st.spinner('Running process...'):
                 
+                if not os.path.exists(f'{folder_name}/data_transcription.json'):
+                    # Get the video wav
+                    data_transcription = pte.transcribe(pdf_file)
+
+                    with open(f"{folder_name}/data_transcription.json", "w") as f:
+                        json.dump(data_transcription, f, indent=4)
+                else:
+                    with open(f"{folder_name}/data_transcription.json", "r") as f:
+                        data_transcription = json.load(f)
+                    
+                segments = data_transcription['segments']
+                
+                # Generate embeddings
+                if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
+                    for i, segment in enumerate(segments):
+                        bar.progress(max(math.ceil((i/len(segments) * 100)), 1))
+                        openai.api_key = user_secret
+                        response = openai.Embedding.create(
+                            input= segment["text"].strip(),
+                            model="text-embedding-ada-002"
+                        )
+                        embeddings = response['data'][0]['embedding']
+                        meta = {
+                            "text": segment["text"].strip(),
+                            "embedding": embeddings
+                        }
+                        data.append(meta)
+                    
+                    pd.DataFrame(data).to_csv(f'{folder_name}/word_embeddings.csv') 
+                else:   
+                    data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
+                    embeddings = data["embedding"]
+                bar.progress(100)
+                st.success('Analysis completed')                
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
 
@@ -188,7 +224,7 @@ with tab6:
         # Return the context
         return "\n\n###\n\n".join(returns)
 
-    def generate_response(api_key, prompt):
+    def generate_response(prompt):
         one_shot_prompt = '''I am YoutubeGPT, a highly intelligent question answering bot. If you ask me a question that is rooted in truth, I will give you the answer.
         Q: What is human life expectancy in the United States?
         A: Human life expectancy in the United States is 78 years.
@@ -200,7 +236,7 @@ with tab6:
             max_tokens = 1024,
             n = 1,
             stop=["Q:"],
-            temperature=0.2,
+            temperature=0.5,
         )
         message = completions.choices[0].text
         return message
@@ -212,7 +248,7 @@ with tab6:
         string_title = "\n\n###\n\n".join(title)
         user_input_embedding = 'Using this context: "'+string_title+'. '+text_embedding+'", answer the following question. \n'+user_input
         # st.write(user_input_embedding)
-        output = generate_response(user_secret, user_input_embedding)
+        output = generate_response(user_input_embedding)
         st.session_state.past.append(user_input)
         st.session_state.generated.append(output)
     if st.session_state['generated']:
