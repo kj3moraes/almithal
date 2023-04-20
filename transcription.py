@@ -5,10 +5,11 @@ from pydub import AudioSegment
 from pydub.utils import make_chunks
 
 # For getting text from PDF
-import PyPDF2
+from io import StringIO 
 
 # For transcription
-import openai, whisper
+import openai, whisper, torch
+import tiktoken
 
 # For other stuff
 import os, re
@@ -101,12 +102,14 @@ class DownloadAudio:
         return chunk_names
 
 
-class Transcription:
+class VideoTranscription:
     """Performs transcription on a PDF or a link to a youtube video"""
 
     def __init__(self, datalink) -> None:
         self.datalink = datalink
         self.model = whisper.load_model('base')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
         openai.api_key = os.environ.get("OPENAI_API_KEY")
         
     def transcribe(self) -> dict:
@@ -120,33 +123,6 @@ class Transcription:
         end_time = time.time()
         print(f"transcription took {end_time - start_time} seconds")
         return transcript
-            
-
-    def get_text_from_pdf(self) -> dict:
-        # Get the text from the PDF
-        with open(self.datalink, 'rb') as f:
-
-            pdf_reader = PyPDF2.PdfReader(f)
-            text = ""
-            for page in pdf_reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    
-                    # Preprocess the text
-                    page_text = re.sub(r'\n', ' ', page_text)  # remove newlines
-                    page_text = re.sub(r'\s+', ' ', page_text)  # remove extra spaces
-                    
-                    # Add to the overall text
-                    text += page_text
-
-        # Construct the final output
-        output = {
-            "name:": self.datalink,
-            "transcription": text,
-            "segments": None
-        }
-        return output
-
 
     def get_text_from_link(self) -> dict:
 
@@ -170,7 +146,7 @@ class Transcription:
             # Get the transcription
             # We are guaranteed that this will be under the max size
             chunk_transcription = self.model.transcribe(file_name, fp16=False)
-            text_transcriptions += chunk_transcription["text"]
+            text_transcriptions += chunk_transcription["text"].replace("$", "\$")
             segments.append(chunk_transcription["segments"])
 
         # Flatten the segments 
@@ -178,8 +154,41 @@ class Transcription:
 
         final_transcription = {
             "title": audio_file.get_yt_title(),
-            "transcription": text_transcriptions,
+            "text": text_transcriptions,
             "segments": segments
         }
 
         return final_transcription
+    
+    
+class PDFTranscription:
+    
+    def __init__(self, title):
+        self.name = title
+        self.encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        
+    def transcribe(self, pdf_file):
+        stringio = StringIO(pdf_file.getvalue().decode("utf-8"))
+        pdf_transcription = stringio.read()
+        
+        sentences = pdf_transcription.split("\n")
+        segments = []
+        for i, sentence in enumerate(sentences):
+            segment = {
+                "id":i,
+                "text":sentence,
+                "tokens":self.encoding.encode(sentence)
+            }
+            
+            segments.append(segment)
+        
+        final_transcription = {
+            "title":self.title,
+            "text":pdf_transcription,
+            "segments":segments
+        }
+        
+        return final_transcription
+        
+        
+        

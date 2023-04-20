@@ -1,5 +1,0 @@
-torch
-pytube
-openai-whisper
-whisper
-streamlit
