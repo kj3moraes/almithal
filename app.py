@@ -11,6 +11,7 @@ import os, json
 import math
 
 from transcription import *
+from keywords import KeyTakeaways
 from summary import TextSummarizer
 import models as md
 
@@ -24,30 +25,31 @@ audio_file = ''
 folder_name = "./tests/"
 input_accepted = False
 
+is_completed_analysis = False
+
 config = Config(height=500,
                 width=700, 
-                nodeHighlightBehavior=True,
-                highlightColor="#F7A7A6", 
                 directed=True, 
                 collapsible=True)
 
 nodes = []
 edges = []
 
-nodes.append( Node(id="Spiderman", 
+nodes.append( Node(id="spiderman", 
                    label="Peter Parker", 
                    size=25, 
                    shape="circularImage",
                    image="http://marvel-force-chart.surge.sh/marvel_force_chart_img/top_spiderman.png") 
             ) # includes **kwargs
-nodes.append( Node(id="Captain Marvel", 
+nodes.append( Node(id="captain_marvel", 
+                   label="Captain Marvel",
                    size=25,
                    shape="circularImage",
                    image="http://marvel-force-chart.surge.sh/marvel_force_chart_img/top_captainmarvel.png") 
             )
-edges.append( Edge(source="Captain Marvel", 
+edges.append( Edge(source="captain_marvel", 
                    label="friend_of", 
-                   target="Spiderman", 
+                   target="spiderman", 
                    # **kwargs
                    ) 
             )
@@ -65,9 +67,8 @@ bar = st.progress(0)
 with st.sidebar:
     youtube_link = st.text_input(label = ":white[Youtube link]",
                                 placeholder = "")
-    st.markdown("OR")
-    pdf_file = st.file_uploader(label = ":white[PDF file]",
-                                type = "pdf")
+    # st.markdown("OR")
+    pdf_file = None
     
     gen_keywords = st.radio(
         "Generate keywords from text?",
@@ -172,13 +173,14 @@ with st.sidebar:
                     embeddings = data["embedding"]
                 bar.progress(100)
                 st.success('Analysis completed')  
+    text_df = pd.DataFrame.from_dict({"title": [data_transcription["title"]], "text":[data_transcription["text"]]})
+            
 
-
-text_df = pd.DataFrame.from_dict({"title": [data_transcription["title"]], "text":[data_transcription["text"]]})
-                
-with st.spinner('Breaking up text into more reasonable chunks (transformers cannot exceed a 1024 token max)...'):
+with st.spinner('Breaking up the text and doing analysis...'):
     # For each body of text, create text chunks of a certain token size required for the transformer
     text_chunks_lib = dict()
+    title_entry = text_df['title'][0]
+    print(title_entry)
     for i in range(0, len(text_df)):
         nested_sentences = md.create_nest_sentences(document=text_df['text'][i], token_max_length=1024)
         # For each chunk of sentences (within the token max)
@@ -186,11 +188,15 @@ with st.spinner('Breaking up text into more reasonable chunks (transformers cann
         for n in range(0, len(nested_sentences)):
             tc = " ".join(map(str, nested_sentences[n]))
             text_chunks.append(tc)
-        title_entry = text_df['title'][i]
-        text_chunks_lib[title_entry] = text_chunks
+        
+        text_chunks_lib[title_entry] = text_chunks    
+    
+    # Generate key takeaways 
+    key_engine = KeyTakeaways(title_entry)
+    keywords = key_engine.get_keywords(text_chunks_lib)
 
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Keywords", "Q&A"])
 
 # =========== INTRODUCTION ===========
 with tab1:
@@ -236,9 +242,11 @@ with tab4:
                         edges=edges, 
                         config=config)
 
-# =========== KEY QUESTIONS ===========
+# =========== KEY TAKEAWAYS ===========
 with tab5:
-    st.header("Key Questions:")
+    st.header("Keywords:")
+    for i, keyword in enumerate(keywords):
+        st.markdown(f"{i+1}. {keyword}")
     
 # =========== QUERY BOT ===========
 with tab6:
@@ -308,3 +316,6 @@ with tab6:
             message(st.session_state["generated"][i], key=str(i))
             message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
             
+
+if is_completed_analysis:
+    st.header("Key Takeaways:")
