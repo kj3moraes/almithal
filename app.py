@@ -62,10 +62,10 @@ bar = st.progress(0)
 
 # =========== SIDEBAR FOR GENERATION ===========
 with st.sidebar:
-    youtube_link = st.text_input(label = ":white[Youtube link]",
+    youtube_link = st.text_input(label = "[Youtube link]",
                                 placeholder = "")
-    # st.markdown("OR")
-    pdf_file = None
+    st.markdown("OR")
+    pdf_file = st.file_uploader("Upload your PDF", type="pdf")
     
     gen_keywords = st.radio(
         "Generate keywords from text?",
@@ -83,7 +83,6 @@ with st.sidebar:
     )
     
     if youtube_link:
-        input_accepted = True
         vte = VideoTranscription(youtube_link)
         YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
         folder_name = f"./tests/{YOUTUBE_VIDEO_ID}"
@@ -131,15 +130,13 @@ with st.sidebar:
     # PDF Transcription 
     elif pdf_file is not None:
         pte = PDFTranscription(pdf_file.name)
-        folder_name = f"./tests/{pdf_file.name}".replace(' ', '')
-        
+
         if st.button("Start Analysis"):
             with st.spinner('Running process...'):
                 
                 if not os.path.exists(f'{folder_name}/data_transcription.json'):
                     # Get the video wav
                     data_transcription = pte.transcribe(pdf_file)
-
                     with open(f"{folder_name}/data_transcription.json", "w") as f:
                         json.dump(data_transcription, f, indent=4)
                 else:
@@ -163,7 +160,8 @@ with st.sidebar:
                             "embedding": embeddings
                         }
                         data.append(meta)
-                    
+                        st.write(meta)
+                                            
                     pd.DataFrame(data).to_csv(f'{folder_name}/word_embeddings.csv') 
                 else:   
                     data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
@@ -171,6 +169,7 @@ with st.sidebar:
                 bar.progress(100)
                 st.success('Analysis completed')  
     text_df = pd.DataFrame.from_dict({"title": [data_transcription["title"]], "text":[data_transcription["text"]]})
+    input_accepted = True
             
 
 with st.spinner('Breaking up the text and doing analysis...'):
@@ -206,33 +205,41 @@ with tab1:
 
 # =========== SUMMARIZATION ===========
 with tab2: 
-    se = TextSummarizer(title_entry)
     
-    st.header("TL;DR")
-    if input_accepted:
-        if gen_summary == 'Yes':
-            with st.spinner("Generating TLDR ...."):
-                text_transcription = data_transcription['text']
-                print("Working on summarization")
-                tldr = se.generate_short_summary(text_chunks_lib)
-                st.write(tldr)
-    
-    st.header("Summary")
-    if input_accepted:
-        if gen_summary == 'Yes':
-            with st.spinner("Generating summary ...."):
-                text_transcription = data_transcription['text']
-                print("Working on summarization")
-                se = TextSummarizer(title_entry)
+    if gen_summary == 'Yes':
+        if input_accepted:
+            se = TextSummarizer(title_entry)
+            text_transcription = data_transcription['text']
+            # st.write(data_transcription)
+            # st.write(text_chunks_lib)
+            # st.dataframe(text_df)
+            with st.spinner("Generating summary and TLDR..."):
                 summary = se.generate_full_summary(text_chunks_lib)
-                st.write(summary)
-        else:
-            st.warning("Summary was not selected")
+                summary_list = summary.split("\n\n")
+                tldr = se.generate_short_summary(summary_list)
+            
+            with open(f"{folder_name}/summary.json", "w") as f:
+                json.dump({
+                    "summary":summary,
+                    "tldr":tldr,
+                    "summary_break":summary_list
+                }, f, indent=4)
+            
+            st.header("TL;DR")
+            tldrs = tldr.split('.')
+            for point in tldrs:
+                st.markdown(f"- {point}")
+            st.header("Summary")
+            st.write(summary)
+    else:
+        st.warning("Summary was not selected")    
+    
 
 # =========== TRANSCRIPTION ===========
 with tab3:
     if input_accepted:
         st.header("Transcription")
+        st.write(data_transcription)
         if gen_transcript == 'Yes':
             with st.spinner("Generating transcript ..."):
                 for text in text_chunks_lib[title_entry]:
@@ -245,10 +252,10 @@ with tab3:
 # =========== MIND MAP ===========
 with tab4:
     st.header("Mind Map")
-    
-    return_value = agraph(nodes=nodes, 
-                        edges=edges, 
-                        config=config)
+    if input_accepted:
+        return_value = agraph(nodes=nodes, 
+                            edges=edges, 
+                            config=config)
 
 # =========== KEY TAKEAWAYS ===========
 with tab5:

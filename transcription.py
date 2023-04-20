@@ -6,7 +6,14 @@ from pydub.utils import make_chunks
 
 # For getting text from PDF
 from io import StringIO 
-
+from zipfile import ZipFile
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.converter import TextConverter
+from pdfminer.layout import LAParams
+from pdfminer.pdfpage import PDFPage
+from io import StringIO
+import base64
+import streamlit as st
 # For transcription
 import openai, whisper, torch
 import tiktoken
@@ -161,33 +168,68 @@ class VideoTranscription:
         return final_transcription
     
     
+@st.cache_data
+def convert_pdf_to_txt_pages(path):
+    texts = []
+    rsrcmgr = PDFResourceManager()
+    retstr = StringIO()
+    laparams = LAParams()
+    device = TextConverter(rsrcmgr, retstr, laparams=laparams)
+    interpreter = PDFPageInterpreter(rsrcmgr, device)
+    
+    size = 0
+    c = 0
+    file_pages = PDFPage.get_pages(path)
+    nbPages = len(list(file_pages))
+    
+    for page in PDFPage.get_pages(path):
+        interpreter.process_page(page)
+        t = retstr.getvalue()     
+        if c == 0:
+            texts.append(t)
+        else:
+            texts.append(t[size:])
+        c = c + 1
+        size = len(t)
+        
+    device.close()
+    retstr.close()
+    return texts, nbPages    
+    
 class PDFTranscription:
     
     def __init__(self, title):
-        self.name = title
+        self.title = title
+        self.folder_name = f"./tests/{self.title}".replace(' ', '')
+        self.folder_name = self.folder_name[:self.folder_name.rindex('.')]
         self.encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
-        
+    
     def transcribe(self, pdf_file):
-        stringio = StringIO(pdf_file.getvalue().decode("utf-8"))
-        pdf_transcription = stringio.read()
+        # stringio = StringIO(pdf_file.getvalue().decode("ISO-8859-1"))
+        # pdf_transcription = stringio.read() 
         
-        sentences = pdf_transcription.split("\n")
-        segments = []
-        for i, sentence in enumerate(sentences):
-            segment = {
-                "id":i,
-                "text":sentence,
-                "tokens":self.encoding.encode(sentence)
-            }
+        # if not os.path.exists(f"{self.folder_name}"):
+        #     os.mkdir(self.folder_name)
+        
+        # sentences = pdf_transcription.split("\n")
+        # segments = []
+        # for i, sentence in enumerate(sentences):
+        #     segment = {
+        #         "id":i,
+        #         "text":sentence,
+        #         "tokens":self.encoding.encode(sentence)
+        #     }
             
-            segments.append(segment)
-        
+        #     segments.append(segment)
+        path = pdf_file.read()
+        text, nbpages = convert_pdf_to_txt_pages(path)
         final_transcription = {
             "title":self.title,
-            "text":pdf_transcription,
-            "segments":segments
-        }
-        
+            # "text":pdf_transcription,
+            # "segments":segments,
+            "pages": nbpages,
+            "texts":text
+        }        
         return final_transcription
         
         
