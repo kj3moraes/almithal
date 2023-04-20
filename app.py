@@ -53,7 +53,6 @@ with st.sidebar:
                 else:
                     with open(f"{folder_name}/data_transcription.json", "r") as f:
                         data_transcription = json.load(f)
-                    print(data_transcription["title"])
                     
                 segments = data_transcription['segments']
                 
@@ -77,11 +76,9 @@ with st.sidebar:
                     st.success('Analysis completed')
                 else:   
                     data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
-                    print(data.head(5))
-                    embeddings = data.loc[:,"embeddings"]
-                    print(embeddings)
+                    embeddings = data["embedding"]
 
-st.markdown('# Almithal')
+st.header('Almithal')
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Key Questions", "Q&A"])
 with tab1:
@@ -103,9 +100,7 @@ with tab4:
     st.header("Mind Map")
 with tab5:
     st.header("Key Questions:")
-    if os.path.exists(f"{folder_name}/word_embeddings.csv"):
-        df = pd.read_csv(f'{folder_name}/word_embeddings.csv')
-        st.write(df)
+    
 
 with tab6:
     if 'generated' not in st.session_state:
@@ -121,7 +116,7 @@ with tab6:
             return input_text
     user_input = get_text()
 
-    def get_embedding_text(api_key, prompt):
+    def get_embedding_text(prompt):
         openai.api_key = user_secret
         response = openai.Embedding.create(
             input= prompt.strip(),
@@ -160,8 +155,9 @@ with tab6:
         return message
 
     if user_input:
-        text_embedding = get_embedding_text(user_secret, user_input)
-        title = pd.read_csv(f'{folder_name}/data_transcription.json')['title']
+        text_embedding = get_embedding_text(user_input)
+        with open(f'{folder_name}/data_transcription.json', "r") as f:
+            title = json.load(f)['title']
         string_title = "\n\n###\n\n".join(title)
         user_input_embedding = 'Using this context: "'+string_title+'. '+text_embedding+'", answer the following question. \n'+user_input
         # st.write(user_input_embedding)
