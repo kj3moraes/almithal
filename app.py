@@ -58,7 +58,7 @@ user_secret = os.getenv("OPENAI_API_KEY")
 
 # Define the purpose of the application
 st.header('Almithal')
-st.subheader('Almithal is a comprhensive video and PDF study buddy.')
+st.subheader('Almithal is a comprehensive video and PDF study buddy.')
 st.write('It provides a summary, transcription, key insights, a mind map and a Q&A feature where you can actually "talk" to the datasource.')
 
 bar = st.progress(0)
@@ -209,15 +209,26 @@ with tab1:
 
 # =========== SUMMARIZATION ===========
 with tab2: 
+    se = TextSummarizer(title_entry)
+    
+    st.header("TL;DR")
+    if input_accepted:
+        if gen_summary == 'Yes':
+            with st.spinner("Generating summary ...."):
+                text_transcription = data_transcription['text']
+                print("Working on summarization")
+                tldr = se.generate_short_summary(text_chunks_lib)
+                st.write(tldr)
+    
     st.header("Summary")
     if input_accepted:
         if gen_summary == 'Yes':
             with st.spinner("Generating summary ...."):
-                # text_transcription = data_transcription['text']
-                # print("Working on summarization")
-                # se = TextSummarizer()
-                # summary = se.summarize(text_chunks_lib)
-                st.write("smmary daone")
+                text_transcription = data_transcription['text']
+                print("Working on summarization")
+                se = TextSummarizer(title_entry)
+                summary = se.generate_full_summary(text_chunks_lib)
+                st.write(summary)
         else:
             st.warning("Summary was not selected")
 

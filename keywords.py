@@ -7,9 +7,10 @@ class KeyTakeaways:
         self.title_element = []
         self.kw_model = md.load_keyword_model()
         
-    def get_keywords(self, text_chunks_lib:pd.DataFrame) -> pd.DataFrame:
+    def get_keywords(self, text_chunks_lib:dict) -> list:
         kw_dict = dict()
         text_chunk_counter = 0
+        
         for key in text_chunks_lib:
             keywords_list = []
             for text_chunk in text_chunks_lib[key]:

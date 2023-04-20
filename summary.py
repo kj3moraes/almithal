@@ -1,7 +1,8 @@
 import bentoml
-import torch
+import pandas as pd
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
+import models as md
 import nltk
 
 nltk.download("punkt")
@@ -9,49 +10,29 @@ from nltk.tokenize import sent_tokenize
 
 
 class TextSummarizer(bentoml.Runnable):
-    SUPPORTS_CPU_MULTI_THREADING = True
-    SUPPORTED_RESOURCES = ("nvidia.com/gpu", "cpu")
+    
+    def __init__(self, title):
+        self.title = title
+        self.summarizer = md.load_summary_model()
+        
+    def generate_short_summary(self, text_chunks_libs:pd.DataFrame) -> str:
+        PROMPT = """
+        You are a as ad .
+        """
+        
+    def generate_full_summary(self, text_chunks_lib:dict) -> str:
+        sum_dict = dict()
+        for _, key in enumerate(text_chunks_lib):
+            
+            # for key in text_chunks_lib:
+            summary = []
+            for num_chunk, text_chunk in enumerate(text_chunks_lib[key]):
+                chunk_summary = md.summarizer_gen(self.summarizer, sequence=text_chunk, maximum_tokens=400, minimum_tokens=100)
+                summary.append(chunk_summary)
 
-    def __init__(self):
-        self.model = T5ForConditionalGeneration.from_pretrained("t5-base")
-        self.tokenizer = T5Tokenizer.from_pretrained("t5-base")
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.max_len = 512
-        self.model.to(self.device)
+                # Combine all the summaries into a list and compress into one document, again
+                final_summary = "\n\n".join(list(summary))
+                sum_dict[key] = [final_summary]
 
-    @staticmethod
-    def postprocesstext(content):
-        final = ""
-        for sent in sent_tokenize(content):
-            sent = sent.capitalize()
-            final = final + " " + sent
-        return final
-
-    @bentoml.Runnable.method(batchable=False)
-    def summarize(self, text):
-        encoding = self.tokenizer.encode_plus(
-            text,
-            max_length=self.max_len,
-            pad_to_max_length=False,
-            truncation=True,
-            return_tensors="pt",
-        ).to(self.device)
-
-        input_ids, attention_mask = encoding["input_ids"], encoding["attention_mask"]
-
-        outs = self.model.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            early_stopping=True,
-            num_beams=3,
-            num_return_sequences=1,
-            no_repeat_ngram_size=2,
-            min_length=75,
-            max_length=300,
-        )
-
-        dec = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in outs]
-        summary = dec[0]
-        summary = TextSummarizer.postprocesstext(summary)
-        output = {"summary": summary}
-        return output
+        return sum_dict[self.title][0]
+        
