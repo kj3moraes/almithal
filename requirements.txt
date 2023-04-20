@@ -35,7 +35,6 @@ decorator==4.4.2
 deepmerge==1.1.0
 Deprecated==1.2.13
 distro==1.7.0
-ec2-hibinit-agent==1.0.0
 entrypoints==0.4
 exceptiongroup==1.1.1
 ffmpeg-python==0.2.0
