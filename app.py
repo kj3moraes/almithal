@@ -9,13 +9,15 @@ import openai
 from openai.embeddings_utils import distances_from_embeddings
 import os, json
 import math
+import re
 
 from transcription import *
 from keywords import Keywords
 from summary import TextSummarizer
 import models as md
 
-# whisper
+REGEXP_YOUTUBE_URL = "^(https?\:\/\/)?((www\.)?youtube\.com|youtu\.be)\/.+$"
+
 model = whisper.load_model('base')
 output = ''
 data = []
@@ -69,14 +71,11 @@ with st.sidebar:
                                 placeholder = "")
     st.markdown("OR")
     pdf_file = st.file_uploader("Upload your PDF", type="pdf")
+    st.markdown("OR")
+    audio_file = st.file_uploader("Upload your MP3 audio file", type="pdf")
     
     gen_keywords = st.radio(
         "Generate keywords from text?",
-        ('Yes', 'No')
-    )
-    
-    gen_transcript = st.radio(
-        "Generate transcript ?",
         ('Yes', 'No')
     )
 
@@ -87,97 +86,51 @@ with st.sidebar:
     
     if st.button("Start Analysis"):
         
-        if youtube_link:
+        # Check if it is a valid youtube URL
+        if re.search(REGEXP_YOUTUBE_URL, youtube_link):
             vte = VideoTranscription(youtube_link)
             YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
             folder_name = f"./tests/{YOUTUBE_VIDEO_ID}"
-    
             with st.spinner('Running process...'):
-                
-                if not os.path.exists(f'{folder_name}/data_transcription.json'):
-                    # Get the video wav
-                    data_transcription = vte.transcribe()
-
-                    with open(f"{folder_name}/data_transcription.json", "w") as f:
-                        json.dump(data_transcription, f, indent=4)
-                else:
-                    with open(f"{folder_name}/data_transcription.json", "r") as f:
-                        data_transcription = json.load(f)
-                    
+                data_transcription = vte.transcribe()                    
                 segments = data_transcription['segments']
-                
-                # Generate embeddings
-                if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
-                    for i, segment in enumerate(segments):
-                        bar.progress(max(math.ceil((i/len(segments) * 50)), 1))
-                        openai.api_key = user_secret
-                        response = openai.Embedding.create(
-                            input= segment["text"].strip(),
-                            model="text-embedding-ada-002"
-                        )
-                        embeddings = response['data'][0]['embedding']
-                        meta = {
-                            "text": segment["text"].strip(),
-                            "start": segment['start'],
-                            "end": segment['end'],
-                            "embedding": embeddings
-                        }
-                        data.append(meta)
-                    
-                    pd.DataFrame(data).to_csv(f'{folder_name}/word_embeddings.csv') 
-                else:   
-                    data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
-                    embeddings = data["embedding"]
-                bar.progress(100)
-                st.success('Analysis completed')  
-                    
+                 
         # PDF Transcription 
         elif pdf_file is not None:
             pte = PDFTranscription(pdf_file)
-
+            folder_name = pte.get_redacted_name()
             with st.spinner('Running process...'):
-                
-                if not os.path.exists(f'{folder_name}/data_transcription.json'):
-                    # Get the video wav
-                    data_transcription = pte.transcribe()
-                    with open(f"{folder_name}/data_transcription.json", "w") as f:
-                        json.dump(data_transcription, f, indent=4)
-                else:
-                    with open(f"{folder_name}/data_transcription.json", "r") as f:
-                        data_transcription = json.load(f)
-                    
+                data_transcription = pte.transcribe()
                 segments = data_transcription['segments']
-                print(segments)
-                # Generate embeddings
-                if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
-                    for i, segment in enumerate(segments):
-                        bar.progress(max(math.ceil((i/len(segments) * 50)), 1))
-                        openai.api_key = user_secret
-                        response = openai.Embedding.create(
-                            input= segment["text"].strip(),
-                            model="text-embedding-ada-002"
-                        )
-                        embeddings = response['data'][0]['embedding']
-                        meta = {
-                            "text": segment["text"].strip(),
-                            "embedding": embeddings
-                        }
-                        data.append(meta)
-                        st.write(meta)
-                                            
-                    pd.DataFrame(data).to_csv(f'{folder_name}/word_embeddings.csv') 
-                else:   
-                    data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
-                    embeddings = data["embedding"]
-                bar.progress(100)
-                st.success('Analysis completed')
         else:
             st.error("Please type in your youtube link or upload the PDF")  
             st.experimental_rerun()
+            
+        # Generate embeddings
+        if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
+            for i, segment in enumerate(segments):
+                bar.progress(max(math.ceil((i/len(segments) * 50)), 1))
+                openai.api_key = user_secret
+                response = openai.Embedding.create(
+                    input= segment["text"].strip(),
+                    model="text-embedding-ada-002"
+                )
+                embeddings = response['data'][0]['embedding']
+                meta = {
+                    "text": segment["text"].strip(),
+                    "embedding": embeddings
+                }
+                data.append(meta)
+            
+            pd.DataFrame(data).to_csv(f'{folder_name}/word_embeddings.csv') 
+        else:   
+            data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
+            embeddings = data["embedding"]
         
+        bar.progress(75)
+
         text_df = pd.DataFrame.from_dict({"title": [data_transcription["title"]], "text":[data_transcription["text"]]})
         input_accepted = True
-        is_completed_analysis = True
         
         with st.spinner('Breaking up the text and doing analysis...'):
             # For each body of text, create text chunks of a certain token size required for the transformer
@@ -197,8 +150,7 @@ with st.sidebar:
             key_engine = Keywords(title_entry)
             keywords = key_engine.get_keywords(text_chunks_lib)
         
-        bar.progress(100)
-            
+        # Generate the summary
         if gen_summary == 'Yes':
             se = TextSummarizer(title_entry)
             text_transcription = data_transcription['text']
@@ -206,6 +158,9 @@ with st.sidebar:
                 summary = se.generate_full_summary(text_chunks_lib)
                 summary_list = summary.split("\n\n")
                 tldr = se.generate_short_summary(summary_list)
+                
+        is_completed_analysis = True
+        bar.progress(100)
 
 
 if is_completed_analysis:
@@ -226,44 +181,49 @@ with tab1:
 
 # =========== SUMMARIZATION ===========
 with tab2: 
-    st.header("TL;DR")
-    for point in tldr:
-        st.markdown(f"- {point}")
-    st.header("Summary")
-    st.write(summary)
+    if is_completed_analysis:
+        st.header("TL;DR")
+        for point in tldr:
+            st.markdown(f"- {point}")
+        st.header("Summary")
+        st.write(summary)
+    else:
+        st.warning("Please wait for the analysis to finish")
     
 
 # =========== TRANSCRIPTION ===========
 with tab3:
     if is_completed_analysis:
         st.header("Transcription")
-        if gen_transcript == 'Yes':
-            with st.spinner("Generating transcript ..."):
-                st.write("")
-                for text in text_chunks_lib[title_entry]:
-                    st.write(text)
-        else:
-            st.warning("Transcription was not selected")
+        with st.spinner("Generating transcript ..."):
+            st.write("")
+            for text in text_chunks_lib[title_entry]:
+                st.write(text)
     else:
-        st.error("You need to give a data source")
+        st.warning("Please wait for the analysis to finish")
 
 # =========== MIND MAP ===========
 with tab4:
     st.header("Mind Map")
-    if input_accepted:
+    if is_completed_analysis:
         return_value = agraph(nodes=nodes, 
                             edges=edges, 
                             config=config)
+    else:
+        st.warning("Please wait for the analysis to finish")
 
 # =========== KEY TAKEAWAYS ===========
 with tab5:
     st.header("Keywords:")
-    if input_accepted:
+    if is_completed_analysis:
         for i, keyword in enumerate(keywords):
             st.markdown(f"{i+1}. {keyword}")
-    
+    else:
+        st.warning("Please wait for the analysis to finish")
+
 # =========== QUERY BOT ===========
 with tab6:
+    
     if 'generated' not in st.session_state:
         st.session_state['generated'] = []
 
@@ -299,11 +259,15 @@ with tab6:
         return "\n\n###\n\n".join(returns)
 
     def generate_response(prompt):
-        one_shot_prompt = '''I am YoutubeGPT, a highly intelligent question answering bot. If you ask me a question that is rooted in truth, I will give you the answer.
-        Q: What is human life expectancy in the United States?
-        A: Human life expectancy in the United States is 78 years.
-        Q: '''+prompt+'''
-        A: '''
+        one_shot_prompt = '''
+            I am YoutubeGPT, a highly intelligent question answering bot.
+            If you ask me a question that is rooted in truth, I will give you the answer.
+            Q: What is human life expectancy in the United States?
+            A: Human life expectancy in the United States is 78 years.
+            Q: '''+prompt+'''
+            A: 
+        '''
+        
         completions = openai.Completion.create(
             engine = "text-davinci-003",
             prompt = one_shot_prompt,
@@ -321,7 +285,6 @@ with tab6:
             title = json.load(f)['title']
         string_title = "\n\n###\n\n".join(title)
         user_input_embedding = 'Using this context: "'+string_title+'. '+text_embedding+'", answer the following question. \n'+user_input
-        # st.write(user_input_embedding)
         output = generate_response(user_input_embedding)
         st.session_state.past.append(user_input)
         st.session_state.generated.append(output)

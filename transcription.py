@@ -227,9 +227,7 @@ class PDFTranscription:
         final_transcription = {
             "title":self.title,
             "text":pdf_transcription,
-            "segments":segments,
-            "pages": nbpages,
-            "texts":text
+            "segments":segments
         }        
         return final_transcription
         
