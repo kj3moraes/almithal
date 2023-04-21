@@ -20,14 +20,14 @@ class TextSummarizer(bentoml.Runnable):
         self.summarizer = md.load_summary_model()
         openai.api_key = os.getenv("OPENAI_API_KEY")
         
-    def generate_short_summary(self, summary_chunks:dict) -> str:
+    def generate_short_summary(self, summary_chunks:dict) -> list:
         PROMPT =  """
             You are a helpful assistant that summarizes youtube videos.
             Someone has already summarized the video to key points.
             Summarize the key points in at most two sentences that capture the essence of the passage.
         """
         
-        final_summary = ""
+        final_summary = []
         for summary_chunk in summary_chunks:
             response = openai.ChatCompletion.create(
             model=self.model,
@@ -37,7 +37,7 @@ class TextSummarizer(bentoml.Runnable):
                 ],
             )
             summary = response["choices"][0]["message"]["content"]
-            final_summary += "\n" + summary
+            final_summary.append(summary)
         
         return final_summary
 

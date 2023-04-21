@@ -54,7 +54,7 @@ class DownloadAudio:
                 self.yt = YouTube(self.link)
                 continue
 
-    def download(self, pathname:str) -> list[str]:
+    def download(self, pathname:str) -> list:
         """
         Download the audio from the youtube video and saves it to multiple .wav files
         in the specified folder. Returns a list of the paths to the .wav files.
@@ -198,35 +198,36 @@ def convert_pdf_to_txt_pages(path):
     
 class PDFTranscription:
     
-    def __init__(self, title):
-        self.title = title
+    def __init__(self, pdf_file):
+        self.file = pdf_file
+        self.title = pdf_file.name
         self.folder_name = f"./tests/{self.title}".replace(' ', '')
         self.folder_name = self.folder_name[:self.folder_name.rindex('.')]
         self.encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        
+    def get_redacted_name(self):
+        return self.folder_name
     
-    def transcribe(self, pdf_file):
-        # stringio = StringIO(pdf_file.getvalue().decode("ISO-8859-1"))
-        # pdf_transcription = stringio.read() 
+    def transcribe(self):
+        text, nbpages = convert_pdf_to_txt_pages(self.file)
+        pdf_transcription = ''.join(text)
         
-        # if not os.path.exists(f"{self.folder_name}"):
-        #     os.mkdir(self.folder_name)
-        
-        # sentences = pdf_transcription.split("\n")
-        # segments = []
-        # for i, sentence in enumerate(sentences):
-        #     segment = {
-        #         "id":i,
-        #         "text":sentence,
-        #         "tokens":self.encoding.encode(sentence)
-        #     }
+        sentences = pdf_transcription.split("\n")
+        segments = []
+        for i, sentence in enumerate(sentences):
+            segment = {
+                "id":i,
+                "text":sentence,
+                "tokens":self.encoding.encode(sentence)
+            }
             
-        #     segments.append(segment)
-        path = pdf_file.read()
-        text, nbpages = convert_pdf_to_txt_pages(path)
+            segments.append(segment)
+            
+        text, nbpages = convert_pdf_to_txt_pages(self.file)
         final_transcription = {
             "title":self.title,
-            # "text":pdf_transcription,
-            # "segments":segments,
+            "text":pdf_transcription,
+            "segments":segments,
             "pages": nbpages,
             "texts":text
         }        

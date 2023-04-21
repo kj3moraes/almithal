@@ -11,7 +11,7 @@ import os, json
 import math
 
 from transcription import *
-from keywords import KeyTakeaways
+from keywords import Keywords
 from summary import TextSummarizer
 import models as md
 
@@ -21,10 +21,13 @@ output = ''
 data = []
 data_transcription = {"title":"", "text":""}
 embeddings = []
-audio_file = ''
+
+text_chunks_lib = dict()
+tldr = ""
+summary = ""
+
 folder_name = "./tests/"
 input_accepted = False
-
 is_completed_analysis = False
 
 config = Config(height=500,
@@ -62,7 +65,7 @@ bar = st.progress(0)
 
 # =========== SIDEBAR FOR GENERATION ===========
 with st.sidebar:
-    youtube_link = st.text_input(label = "[Youtube link]",
+    youtube_link = st.text_input(label = "Type in your Youtube link",
                                 placeholder = "")
     st.markdown("OR")
     pdf_file = st.file_uploader("Upload your PDF", type="pdf")
@@ -82,12 +85,13 @@ with st.sidebar:
         ('Yes', 'No')
     )
     
-    if youtube_link:
-        vte = VideoTranscription(youtube_link)
-        YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
-        folder_name = f"./tests/{YOUTUBE_VIDEO_ID}"
+    if st.button("Start Analysis"):
         
-        if st.button("Start Analysis"):
+        if youtube_link:
+            vte = VideoTranscription(youtube_link)
+            YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
+            folder_name = f"./tests/{YOUTUBE_VIDEO_ID}"
+    
             with st.spinner('Running process...'):
                 
                 if not os.path.exists(f'{folder_name}/data_transcription.json'):
@@ -105,7 +109,7 @@ with st.sidebar:
                 # Generate embeddings
                 if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
                     for i, segment in enumerate(segments):
-                        bar.progress(max(math.ceil((i/len(segments) * 100)), 1))
+                        bar.progress(max(math.ceil((i/len(segments) * 50)), 1))
                         openai.api_key = user_secret
                         response = openai.Embedding.create(
                             input= segment["text"].strip(),
@@ -126,17 +130,16 @@ with st.sidebar:
                     embeddings = data["embedding"]
                 bar.progress(100)
                 st.success('Analysis completed')  
-                
-    # PDF Transcription 
-    elif pdf_file is not None:
-        pte = PDFTranscription(pdf_file.name)
+                    
+        # PDF Transcription 
+        elif pdf_file is not None:
+            pte = PDFTranscription(pdf_file)
 
-        if st.button("Start Analysis"):
             with st.spinner('Running process...'):
                 
                 if not os.path.exists(f'{folder_name}/data_transcription.json'):
                     # Get the video wav
-                    data_transcription = pte.transcribe(pdf_file)
+                    data_transcription = pte.transcribe()
                     with open(f"{folder_name}/data_transcription.json", "w") as f:
                         json.dump(data_transcription, f, indent=4)
                 else:
@@ -144,11 +147,11 @@ with st.sidebar:
                         data_transcription = json.load(f)
                     
                 segments = data_transcription['segments']
-                
+                print(segments)
                 # Generate embeddings
                 if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
                     for i, segment in enumerate(segments):
-                        bar.progress(max(math.ceil((i/len(segments) * 100)), 1))
+                        bar.progress(max(math.ceil((i/len(segments) * 50)), 1))
                         openai.api_key = user_secret
                         response = openai.Embedding.create(
                             input= segment["text"].strip(),
@@ -167,30 +170,47 @@ with st.sidebar:
                     data = pd.read_csv(f'{folder_name}/word_embeddings.csv')
                     embeddings = data["embedding"]
                 bar.progress(100)
-                st.success('Analysis completed')  
-    text_df = pd.DataFrame.from_dict({"title": [data_transcription["title"]], "text":[data_transcription["text"]]})
-    input_accepted = True
-            
-
-with st.spinner('Breaking up the text and doing analysis...'):
-    # For each body of text, create text chunks of a certain token size required for the transformer
-    text_chunks_lib = dict()
-    title_entry = text_df['title'][0]
-    print(title_entry)
-    for i in range(0, len(text_df)):
-        nested_sentences = md.create_nest_sentences(document=text_df['text'][i], token_max_length=1024)
-        # For each chunk of sentences (within the token max)
-        text_chunks = []
-        for n in range(0, len(nested_sentences)):
-            tc = " ".join(map(str, nested_sentences[n]))
-            text_chunks.append(tc)
+                st.success('Analysis completed')
+        else:
+            st.error("Please type in your youtube link or upload the PDF")  
+            st.experimental_rerun()
         
-        text_chunks_lib[title_entry] = text_chunks    
-    
-    # Generate key takeaways 
-    key_engine = KeyTakeaways(title_entry)
-    keywords = key_engine.get_keywords(text_chunks_lib)
+        text_df = pd.DataFrame.from_dict({"title": [data_transcription["title"]], "text":[data_transcription["text"]]})
+        input_accepted = True
+        is_completed_analysis = True
+        
+        with st.spinner('Breaking up the text and doing analysis...'):
+            # For each body of text, create text chunks of a certain token size required for the transformer
+            title_entry = text_df['title'][0]
+            print(title_entry)
+            for i in range(0, len(text_df)):
+                nested_sentences = md.create_nest_sentences(document=text_df['text'][i], token_max_length=1024)
+                # For each chunk of sentences (within the token max)
+                text_chunks = []
+                for n in range(0, len(nested_sentences)):
+                    tc = " ".join(map(str, nested_sentences[n]))
+                    text_chunks.append(tc)
+                
+                text_chunks_lib[title_entry] = text_chunks    
+            
+            # Generate key takeaways 
+            key_engine = Keywords(title_entry)
+            keywords = key_engine.get_keywords(text_chunks_lib)
+        
+        bar.progress(100)
+            
+        if gen_summary == 'Yes':
+            se = TextSummarizer(title_entry)
+            text_transcription = data_transcription['text']
+            with st.spinner("Generating summary and TLDR..."):
+                summary = se.generate_full_summary(text_chunks_lib)
+                summary_list = summary.split("\n\n")
+                tldr = se.generate_short_summary(summary_list)
 
+
+if is_completed_analysis:
+    st.header("Key Takeaways")
+    st.write("Here are some of the key takeaways you cna ")
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Keywords", "Q&A"])
 
@@ -203,45 +223,23 @@ with tab1:
     st.markdown("**Once the file / url has finished saving, a 'Start Analysis' button will appear. Click on this button to begin the note generation**")
     st.warning("NOTE: This is just a demo product in alpha testing. Any and all bugs will soon be fixed")
     st.warning("PLEASE USE VIDEOS OF LENGTH <= 30 MINUTES. CURRENTLY IT IS A BIT SLOW BUT I'M WORKING ON MAKING TRANSCRIPTION AND EMBEDDINGS MUCH FASTER")
+
 # =========== SUMMARIZATION ===========
 with tab2: 
-    
-    if gen_summary == 'Yes':
-        if input_accepted:
-            se = TextSummarizer(title_entry)
-            text_transcription = data_transcription['text']
-            # st.write(data_transcription)
-            # st.write(text_chunks_lib)
-            # st.dataframe(text_df)
-            with st.spinner("Generating summary and TLDR..."):
-                summary = se.generate_full_summary(text_chunks_lib)
-                summary_list = summary.split("\n\n")
-                tldr = se.generate_short_summary(summary_list)
-            
-            with open(f"{folder_name}/summary.json", "w") as f:
-                json.dump({
-                    "summary":summary,
-                    "tldr":tldr,
-                    "summary_break":summary_list
-                }, f, indent=4)
-            
-            st.header("TL;DR")
-            tldrs = tldr.split('.')
-            for point in tldrs:
-                st.markdown(f"- {point}")
-            st.header("Summary")
-            st.write(summary)
-    else:
-        st.warning("Summary was not selected")    
+    st.header("TL;DR")
+    for point in tldr:
+        st.markdown(f"- {point}")
+    st.header("Summary")
+    st.write(summary)
     
 
 # =========== TRANSCRIPTION ===========
 with tab3:
-    if input_accepted:
+    if is_completed_analysis:
         st.header("Transcription")
-        st.write(data_transcription)
         if gen_transcript == 'Yes':
             with st.spinner("Generating transcript ..."):
+                st.write("")
                 for text in text_chunks_lib[title_entry]:
                     st.write(text)
         else:
@@ -260,8 +258,9 @@ with tab4:
 # =========== KEY TAKEAWAYS ===========
 with tab5:
     st.header("Keywords:")
-    for i, keyword in enumerate(keywords):
-        st.markdown(f"{i+1}. {keyword}")
+    if input_accepted:
+        for i, keyword in enumerate(keywords):
+            st.markdown(f"{i+1}. {keyword}")
     
 # =========== QUERY BOT ===========
 with tab6:
@@ -331,6 +330,3 @@ with tab6:
             message(st.session_state["generated"][i], key=str(i))
             message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
             
-
-if is_completed_analysis:
-    st.header("Key Takeaways:")
