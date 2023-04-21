@@ -2,12 +2,14 @@ bentoml==1.0.18
 keybert==0.7.0
 moviepy==1.0.3
 nltk==3.8.1
+matplotlib
 numpy==1.23.5
 openai==0.27.2
 openai_whisper==20230314
 pandas==1.5.3
 pydub==0.25.1
 pytube==12.1.3
+plotly
 pytube3==9.6.4
 streamlit==1.21.0
 streamlit_agraph==0.0.45
