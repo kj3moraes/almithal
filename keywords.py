@@ -1,7 +1,7 @@
 import models as md
 import pandas as pd
 
-class KeyTakeaways:
+class Keywords:
     
     def __init__(self, title_element:str):
         self.title_element = []
