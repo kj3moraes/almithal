@@ -202,7 +202,7 @@ with tab1:
     st.markdown('* Place the PDF file that you want worked on')
     st.markdown("**Once the file / url has finished saving, a 'Start Analysis' button will appear. Click on this button to begin the note generation**")
     st.warning("NOTE: This is just a demo product in alpha testing. Any and all bugs will soon be fixed")
-
+    st.warning("PLEASE USE VIDEOS OF LENGTH <= 30 MINUTES. CURRENTLY IT IS A BIT SLOW BUT I'M WORKING ON MAKING TRANSCRIPTION AND EMBEDDINGS MUCH FASTER")
 # =========== SUMMARIZATION ===========
 with tab2: 
     
