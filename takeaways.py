@@ -29,7 +29,7 @@ class KeyTakeaways:
         PROMPT = """
             You are a super intelligent human and helpful assistant. 
             I am giving you parts of a video transcription that I want to learn from.
-            In bullet points, give me at most 4 key takeaways from this text.
+            In bullet points, give me at most 3 key takeaways from this text.
         """
         
         final_takeaways = []
@@ -46,6 +46,7 @@ class KeyTakeaways:
                     presence_penalty=0.6,
                 )
                 takeaways = extract_bullet_points(response.choices[0].text.strip())
-                final_takeaways.append(takeaways)
+                final_takeaways.extend(takeaways)
+        
         
         return final_takeaways

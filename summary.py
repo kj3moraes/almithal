@@ -5,8 +5,6 @@ import openai
 import os 
 
 nltk.download("punkt")
-from nltk.tokenize import sent_tokenize
-
 
 class TextSummarizer:
     
