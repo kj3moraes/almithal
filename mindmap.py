@@ -1,6 +1,6 @@
 import os
 import openai
-
+import json
 import graphviz
 import streamlit as st
 
@@ -15,7 +15,7 @@ class MindMap:
         PROMPT = state_prompt.read()
         state_prompt.close()
         
-        
+        final_connections = []
         for key in text_chunks_libs:
             for text_chunk in text_chunks_libs[key]:
                 PROMPT = PROMPT.replace("$prompt", text_chunk)
@@ -30,26 +30,21 @@ class MindMap:
                     presence_penalty=0.0,
                 )
                 
-                print("response is ", response.choices[0].text)
-                
-                
-        return []
+                relationships = response.choices[0].text
+                final_string = '{"relations":' + relationships + '}'
+                data = json.loads(final_string)
+                print(data)
+                relations = data["relations"]
+                final_connections.extend(relations)
+                print(final_connections)
+        return final_connections
             
         
     def generate_graph(self, text_chunks_libs:dict):
         graph = graphviz.Digraph()
-        graph.edge('run', 'intr')
-        graph.edge('intr', 'runbl')
-        graph.edge('runbl', 'run')
-        graph.edge('run', 'kernel')
-        graph.edge('kernel', 'zombie')
-        graph.edge('kernel', 'sleep')
-        graph.edge('kernel', 'runmem')
-        graph.edge('sleep', 'swap')
-        graph.edge('swap', 'runswap')
-        graph.edge('runswap', 'new')
-        graph.edge('runswap', 'runmem')
-        graph.edge('new', 'runmem')
-        graph.edge('sleep', 'runmem')
-        self.get_connections(text_chunks_libs)
+        all_connections = self.get_connections(text_chunks_libs)
+        for connection in all_connections:
+            from_node = connection[0]
+            to_node = connection[2]
+            graph.edge(from_node, to_node)
         st.graphviz_chart(graph)

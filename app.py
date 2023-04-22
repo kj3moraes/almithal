@@ -92,8 +92,7 @@ bar = st.progress(0)
 
 # =========== SIDEBAR FOR GENERATION ===========
 with st.sidebar:
-    youtube_link = st.text_input(label = "Type in your Youtube link",
-                                placeholder = "")
+    youtube_link = st.text_input(label = "Type in your Youtube link", placeholder = "", key="url")
     st.markdown("OR")
     pdf_file = st.file_uploader("Upload your PDF", type="pdf")
     st.markdown("OR")
@@ -284,18 +283,7 @@ with tab6:
         st.header("Ask me something about the video:")
         input_text = st.text_input("You: ", key="prompt")
         return input_text
-    
-    
-    if is_completed_analysis:
-        user_input = get_text()
-        print(user_input)
-        print("the folder name at got here 0.5 is ", folder_name)
 
-
-    if is_completed_analysis:
-        user_input = get_text()
-        print(user_input)
-        print("the folder name at got here 0.5 is ", folder_name)
 
     def get_embedding_text(prompt):
         response = openai.Embedding.create(
@@ -345,8 +333,8 @@ with tab6:
     else:
         user_input = None
     
-    # if 'messages' not in st.session_state:
-    #     st.session_state['messages'] = get_initial_message()
+    if 'messages' not in st.session_state:
+        st.session_state['messages'] = get_initial_message()
     
     if user_input:
         print("got here 1")
