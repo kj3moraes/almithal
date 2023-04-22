@@ -204,13 +204,7 @@ if is_completed_analysis:
 
     # =========== INTRODUCTION ===========
     with tab1:
-        st.markdown("## How do I use this?")
-        st.markdown("Do one of the following")
-        st.markdown('* Type in your youtube URL that you want worked on')
-        st.markdown('* Place the PDF file that you want worked on')
-        st.markdown("**Once the file / url has finished saving, a 'Start Analysis' button will appear. Click on this button to begin the note generation**")
-        st.warning("NOTE: This is just a demo product in alpha testing. Any and all bugs will soon be fixed")
-        st.warning("PLEASE USE VIDEOS OF LENGTH <= 30 MINUTES. CURRENTLY IT IS A BIT SLOW BUT I'M WORKING ON MAKING TRANSCRIPTION AND EMBEDDINGS MUCH FASTER")
+        st.markdown("## Please reach to me on Discord to report any bugs (lordvader31#1368) ")
 
     # =========== SUMMARIZATION ===========
     with tab2: 
@@ -331,7 +325,7 @@ else:
     st.markdown('* Place the PDF file that you want worked on')
     st.markdown("**Once the file / url has finished saving, a 'Start Analysis' button will appear. Click on this button to begin the note generation**")
     st.warning("NOTE: This is just a demo product in alpha testing. Any and all bugs will soon be fixed")
-    st.warning("PLEASE USE VIDEOS OF LENGTH <= 30 MINUTES. CURRENTLY IT IS A BIT SLOW BUT I'M WORKING ON MAKING TRANSCRIPTION AND EMBEDDINGS MUCH FASTER")
+    st.warning("After the note taking is done, you will see multiple tabs for more information")
 
     
                     
