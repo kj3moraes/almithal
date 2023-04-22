@@ -43,6 +43,14 @@ folder_name = "./tests"
 input_accepted = False
 is_completed_analysis = False
 
+def get_initial_message():
+    messages=[
+            {"role": "system", "content": "You are a helpful AI Tutor. Who anwers brief questions about AI."},
+            {"role": "user", "content": "I want to learn AI"},
+            {"role": "assistant", "content": "Thats awesome, what do you want to know aboout AI"}
+        ]
+    return messages
+
 nodes = []
 edges = []
 
@@ -237,8 +245,8 @@ with tab2:
 
 # =========== TRANSCRIPTION ===========
 with tab3:
+    st.header("Transcription")
     if is_completed_analysis:
-        st.header("Transcription")
         with st.spinner("Generating transcript ..."):
             st.write("")
             for text in text_chunks_lib[title_entry]:
@@ -249,11 +257,11 @@ with tab3:
 # =========== MIND MAP ===========
 with tab4:
     st.header("Mind Map")
-    # if is_completed_analysis:
-    mindmap = MindMap()
-    mindmap.generate_graph(text_chunks_lib)
-    # else:
-        # st.warning("Please wait for the analysis to finish")
+    if is_completed_analysis:
+        mindmap = MindMap()
+        mindmap.generate_graph(text_chunks_lib)
+    else:
+        st.warning("Please wait for the analysis to finish")
 
 # =========== KEYWORDS ===========
 with tab5:
@@ -265,7 +273,7 @@ with tab5:
         st.warning("Please wait for the analysis to finish")
 
 # =========== QUERY BOT ===========
-with tab6:
+with tab6:  
     if 'generated' not in st.session_state:
         st.session_state['generated'] = []
 
@@ -274,9 +282,16 @@ with tab6:
 
     def get_text():
         st.header("Ask me something about the video:")
-        input_text = st.text_input("You: ","", key="input")
+        input_text = st.text_input("You: ", key="prompt")
         return input_text
     
+    
+    if is_completed_analysis:
+        user_input = get_text()
+        print(user_input)
+        print("the folder name at got here 0.5 is ", folder_name)
+
+
     if is_completed_analysis:
         user_input = get_text()
         print(user_input)
@@ -323,7 +338,17 @@ with tab6:
         message = completions.choices[0].text
         return message
     
-    if user_input is not None:
+    if is_completed_analysis:
+        user_input = get_text()
+        print("user input is ", user_input)
+        print("the folder name at got here 0.5 is ", folder_name)
+    else:
+        user_input = None
+    
+    # if 'messages' not in st.session_state:
+    #     st.session_state['messages'] = get_initial_message()
+    
+    if user_input:
         print("got here 1")
         print("the folder name at got here 1.5 is ", folder_name)
         text_embedding = get_embedding_text(user_input)
@@ -344,4 +369,4 @@ with tab6:
             message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
 
 
-                
+# st.header("What else")
