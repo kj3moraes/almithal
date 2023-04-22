@@ -5,15 +5,13 @@ from pydub import AudioSegment
 from pydub.utils import make_chunks
 
 # For getting text from PDF
-from io import StringIO 
 from zipfile import ZipFile
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
 from io import StringIO
-import base64
-import streamlit as st
+
 # For transcription
 import openai, whisper, torch
 import tiktoken
@@ -166,9 +164,8 @@ class VideoTranscription:
         }
 
         return final_transcription
-    
-    
-@st.cache_data
+
+
 def convert_pdf_to_txt_pages(path):
     texts = []
     rsrcmgr = PDFResourceManager()

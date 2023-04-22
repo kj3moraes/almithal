@@ -1,6 +1,3 @@
-import pandas as pd
-from transformers import T5ForConditionalGeneration, T5Tokenizer
-
 import models as md
 import nltk
 
