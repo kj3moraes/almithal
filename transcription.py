@@ -3,6 +3,8 @@ from pytube import YouTube
 from moviepy.editor import * 
 from pydub import AudioSegment
 from pydub.utils import make_chunks
+import pydub
+from pathlib import Path
 
 # For getting text from PDF
 from zipfile import ZipFile
@@ -14,7 +16,9 @@ from io import StringIO
 
 # For transcription
 import openai, whisper, torch
+from faster_whisper import WhisperModel
 import tiktoken
+from nltk import tokenize
 
 # For other stuff
 import os, re
@@ -30,6 +34,7 @@ MAX_FILE_SIZE_BYTES = 18000000
 
 # The model to use for transcription
 WHISPER_MODEL = "tiny"
+MODEL_SIZE = "base"
 
 class DownloadAudio:
     """Downloads the audio from a youtube video and saves it to multiple .wav files in the specified folder"""
@@ -104,7 +109,7 @@ class DownloadAudio:
             chunk_names.append(output_chunk_path)
             chunk.export(f"{output_chunk_path}", format="wav")
         
-        return chunk_names
+        return chunk_names, FINAL_WAV_PATH
 
 
 class VideoTranscription:
@@ -112,9 +117,8 @@ class VideoTranscription:
 
     def __init__(self, datalink) -> None:
         self.datalink = datalink
-        self.model = whisper.load_model('base')
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
+        self.encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        self.model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
         openai.api_key = os.environ.get("OPENAI_API_KEY")
         
     def transcribe(self) -> dict:
@@ -139,24 +143,26 @@ class VideoTranscription:
         audio_file = DownloadAudio(self.datalink)
 
         # Get the names of the stored wav files
-        file_names = audio_file.download(FOLDER_NAME)
-
-        # # Get the transcription of each segment
+        file_names, original_file_name = audio_file.download(FOLDER_NAME)
+        # Get the transcription of each audio chunk
         text_transcriptions = ""
+        # for file_name in file_names:
+        # Get the transcription
+        chunk_segments, info = self.model.transcribe(original_file_name, beam_size=5)
+        for chunk_segment in chunk_segments:
+            text_transcriptions += chunk_segment.text.replace("$", "\$")    
+
+        # Tokenize each sentence of the transcription. 
+        sentences = tokenize.sent_tokenize(text_transcriptions)
         segments = []
-        for file_name in file_names:
-            
-            audio = open(file_name, "rb")
-
-            # Get the transcription
-            # We are guaranteed that this will be under the max size
-            chunk_transcription = self.model.transcribe(file_name, fp16=False)
-            text_transcriptions += chunk_transcription["text"].replace("$", "\$")
-            segments.append(chunk_transcription["segments"])
-
-        # Flatten the segments 
-        segments = [segment for chunk in segments for segment in chunk]
-
+        for i, sentence in enumerate(sentences):
+            segment = {
+                "id":i,
+                "text":sentence,
+                "tokens":self.encoding.encode(sentence)
+            }
+            segments.append(segment)
+        
         final_transcription = {
             "title": audio_file.get_yt_title(),
             "text": text_transcriptions,
@@ -165,6 +171,70 @@ class VideoTranscription:
 
         return final_transcription
 
+
+class AudioTranscription:
+    """Performs transcription on a MP3 file"""
+
+    def __init__(self, audio_file) -> None:
+        self.file = audio_file
+        self.title = self.file.name
+        self.folder_name = f"./tests/{self.title}".replace(' ', '')
+        self.folder_name = self.folder_name[:self.folder_name.rindex('.')]
+        self.encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        self.model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
+        openai.api_key = os.environ.get("OPENAI_API_KEY")
+        
+    def get_redacted_name(self):
+        return self.folder_name
+        
+    def transcribe(self) -> dict:
+        """Returns the transcription of the MP3 audio as a string"""
+
+        start_time = time.time()
+        if not os.path.exists(self.folder_name):
+            os.mkdir(self.folder_name)
+        
+        if self.title.endswith('wav'):
+            audio = pydub.AudioSegment.from_wav(self.file)
+            file_type = 'wav'
+        elif self.title.endswith('mp3'):
+            audio = pydub.AudioSegment.from_mp3(self.file)
+            file_type = 'mp3'
+
+        save_path = Path(self.folder_name) / self.file.name
+        audio.export(save_path, format=file_type)
+        final_wav_path = save_path
+        
+        if file_type == 'mp3':
+            sound = AudioSegment.from_mp3(save_path)
+            final_wav_path = self.folder_name + "/" +  self.title[:-4]+'.wav'
+            sound.export(final_wav_path, format="wav")
+        
+        chunk_segments, info = self.model.transcribe(final_wav_path, beam_size=5)
+        text_transcriptions = ""
+        for chunk_segment in chunk_segments:
+            text_transcriptions += chunk_segment.text.replace("$", "\$")    
+
+        # Tokenize each sentence of the transcription. 
+        sentences = tokenize.sent_tokenize(text_transcriptions)
+        segments = []
+        for i, sentence in enumerate(sentences):
+            segment = {
+                "id":i,
+                "text":sentence,
+                "tokens":self.encoding.encode(sentence)
+            }
+            segments.append(segment)
+        
+        final_transcription = {
+            "title": self.title,
+            "text": text_transcriptions,
+            "segments": segments
+        }
+        end_time = time.time()
+        print(f"transcription took {end_time - start_time} seconds")
+
+        return final_transcription
 
 def convert_pdf_to_txt_pages(path):
     texts = []
@@ -209,7 +279,7 @@ class PDFTranscription:
         text, nbpages = convert_pdf_to_txt_pages(self.file)
         pdf_transcription = ''.join(text)
         
-        sentences = pdf_transcription.split("\n")
+        sentences = tokenize.sent_tokenize(pdf_transcription)
         segments = []
         for i, sentence in enumerate(sentences):
             segment = {
@@ -219,8 +289,7 @@ class PDFTranscription:
             }
             
             segments.append(segment)
-            
-        text, nbpages = convert_pdf_to_txt_pages(self.file)
+        
         final_transcription = {
             "title":self.title,
             "text":pdf_transcription,

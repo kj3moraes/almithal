@@ -35,7 +35,6 @@ class KeyTakeaways:
         final_takeaways = []
         for key in text_chunks_lib:
             for text_chunk in text_chunks_lib[key]:
-                print(text_chunk)
                 response = openai.Completion.create(
                     engine="text-davinci-003",
                     prompt=PROMPT + text_chunk,
