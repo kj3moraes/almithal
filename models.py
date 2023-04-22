@@ -1,5 +1,5 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline, BartTokenizer, BartForConditionalGeneration
+
 import streamlit as st
 from keybert import KeyBERT
 import re
@@ -48,12 +48,12 @@ def load_summary_model():
     summarizer = pipeline(task='summarization', model=model_name)
     return summarizer
 
-# def load_summary_model():
-#     model_name = "facebook/bart-large-mnli"
-#     tokenizer = BartTokenizer.from_pretrained(model_name)
-#     model = BartForConditionalGeneration.from_pretrained(model_name)
-#     summarizer = pipeline(task='summarization', model=model, tokenizer=tokenizer, framework='pt')
-#     return summarizer
+def load_summary_model_large():
+    model_name = "facebook/bart-large-mnli"
+    tokenizer = BartTokenizer.from_pretrained(model_name)
+    model = BartForConditionalGeneration.from_pretrained(model_name)
+    summarizer = pipeline(task='summarization', model=model, tokenizer=tokenizer, framework='pt')
+    return summarizer
 
 def summarizer_gen(summarizer, sequence:str, maximum_tokens:int, minimum_tokens:int):
 	output = summarizer(sequence, 
@@ -71,7 +71,7 @@ def summarizer_gen(summarizer, sequence:str, maximum_tokens:int, minimum_tokens:
 # # Custom summarization pipeline (to handle long articles)
 # def summarize(text, minimum_length_of_summary = 100):
 #     # Tokenize and truncate
-#     inputs = tokenizer_bart([text], truncation=True, max_length=1024, return_tensors='pt').to('cuda')
+#     inputs = tokenizer([text], truncation=True, max_length=1024, return_tensors='pt').to('cuda')
 #     # Generate summary 
 #     summary_ids = model_bart.generate(inputs['input_ids'], num_beams=4, min_length = minimum_length_of_summary, max_length=400, early_stopping=True)
 #     # Untokenize
