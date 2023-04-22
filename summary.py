@@ -1,4 +1,3 @@
-import bentoml
 import pandas as pd
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
@@ -12,7 +11,7 @@ nltk.download("punkt")
 from nltk.tokenize import sent_tokenize
 
 
-class TextSummarizer(bentoml.Runnable):
+class TextSummarizer:
     
     def __init__(self, title):
         self.title = title
@@ -30,11 +29,11 @@ class TextSummarizer(bentoml.Runnable):
         final_summary = []
         for summary_chunk in summary_chunks:
             response = openai.ChatCompletion.create(
-            model=self.model,
-            messages=[
-                    {"role": "system", "content": PROMPT},
-                    {"role": "user", "content": summary_chunk},
-                ],
+                model=self.model,
+                messages=[
+                        {"role": "system", "content": PROMPT},
+                        {"role": "user", "content": summary_chunk},
+                    ],
             )
             summary = response["choices"][0]["message"]["content"]
             final_summary.append(summary)
@@ -50,7 +49,7 @@ class TextSummarizer(bentoml.Runnable):
             # for key in text_chunks_lib:
             summary = []
             for _, text_chunk in enumerate(text_chunks_lib[key]):
-                chunk_summary = md.summarizer_gen(self.summarizer, sequence=text_chunk, maximum_tokens=400, minimum_tokens=100)
+                chunk_summary = md.summarizer_gen(self.summarizer, sequence=text_chunk, maximum_tokens=500, minimum_tokens=100)
                 summary.append(chunk_summary)
 
                 # Combine all the summaries into a list and compress into one document, again

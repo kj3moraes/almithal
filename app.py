@@ -1,32 +1,41 @@
+# Streamlit classes
 import streamlit as st
 from streamlit_agraph import agraph, Node, Edge, Config
+from streamlit_chat import message
 
+# Data manipulation and embeddings
 import pandas as pd
 import numpy as np
-import whisper
-from streamlit_chat import message
 import openai
 from openai.embeddings_utils import distances_from_embeddings
+import whisper
+
+# Exec tasks
 import os, json
 import math
 import re
 
+# Custom classes 
 from transcription import *
 from keywords import Keywords
 from summary import TextSummarizer
+from takeaways import KeyTakeaways
 import models as md
+
 
 REGEXP_YOUTUBE_URL = "^(https?\:\/\/)?((www\.)?youtube\.com|youtu\.be)\/.+$"
 
 model = whisper.load_model('base')
+
 output = ''
 data = []
 data_transcription = {"title":"", "text":""}
 embeddings = []
-
 text_chunks_lib = dict()
+
 tldr = ""
 summary = ""
+takeaways = []
 
 folder_name = "./tests/"
 input_accepted = False
@@ -158,6 +167,11 @@ with st.sidebar:
                 summary = se.generate_full_summary(text_chunks_lib)
                 summary_list = summary.split("\n\n")
                 tldr = se.generate_short_summary(summary_list)
+        
+        # Generate key takeaways
+        kt = KeyTakeaways()
+        with st.spinner("Generating key takeaways ... "):
+            takeaways = kt.generate_key_takeaways(text_chunks_lib)
                 
         is_completed_analysis = True
         bar.progress(100)
@@ -165,7 +179,10 @@ with st.sidebar:
 
 if is_completed_analysis:
     st.header("Key Takeaways")
-    st.write("Here are some of the key takeaways you cna ")
+    st.write("Here are some of the key takeaways from the data:")
+    for takeaway in takeaways:
+        st.markdown(f"- {takeaway}")
+
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Keywords", "Q&A"])
 
@@ -189,7 +206,6 @@ with tab2:
         st.write(summary)
     else:
         st.warning("Please wait for the analysis to finish")
-    
 
 # =========== TRANSCRIPTION ===========
 with tab3:
@@ -212,7 +228,7 @@ with tab4:
     else:
         st.warning("Please wait for the analysis to finish")
 
-# =========== KEY TAKEAWAYS ===========
+# =========== KEYWORDS ===========
 with tab5:
     st.header("Keywords:")
     if is_completed_analysis:
