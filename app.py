@@ -37,7 +37,7 @@ tldr = ""
 summary = ""
 takeaways = []
 
-folder_name = "./tests/"
+folder_name = "./tests"
 input_accepted = False
 is_completed_analysis = False
 
