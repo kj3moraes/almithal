@@ -115,6 +115,9 @@ with st.sidebar:
             vte = VideoTranscription(youtube_link)
             YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
             folder_name = f"./tests/{YOUTUBE_VIDEO_ID}"
+            if not os.path.exists(folder_name):
+                os.mkdir(folder_name)
+            
             with st.spinner('Running process...'):
                 data_transcription = vte.transcribe()                    
                 segments = data_transcription['segments']
@@ -126,6 +129,8 @@ with st.sidebar:
         elif pdf_file is not None:
             pte = PDFTranscription(pdf_file)
             folder_name = pte.get_redacted_name()
+            if not os.path.exists(folder_name):
+                os.mkdir(folder_name)
             
             with st.spinner('Running process...'):
                 data_transcription = pte.transcribe()
@@ -135,6 +140,8 @@ with st.sidebar:
         elif audio_file is not None:
             ate = AudioTranscription(audio_file)
             folder_name = ate.get_redacted_name()
+            if not os.path.exists(f""):
+                os.mkdir(folder_name)
             
             with st.spinner('Running process...'):
                 data_transcription = ate.transcribe()
