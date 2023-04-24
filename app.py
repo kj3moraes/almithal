@@ -20,6 +20,7 @@ from transcription import *
 from keywords import Keywords
 from summary import TextSummarizer
 from takeaways import KeyTakeaways
+from mindmap import MindMap
 import models as md
 
 
@@ -32,6 +33,7 @@ data = []
 data_transcription = {"title":"", "text":""}
 embeddings = []
 text_chunks_lib = dict()
+user_input = None
 
 tldr = ""
 summary = ""
@@ -41,29 +43,43 @@ folder_name = "./tests"
 input_accepted = False
 is_completed_analysis = False
 
-config = Config(height=500,
-                width=700, 
-                directed=True, 
-                collapsible=True)
+def get_initial_message():
+    messages=[
+            {"role": "system", "content": "You are a helpful AI Tutor. Who anwers brief questions about AI."},
+            {"role": "user", "content": "I want to learn AI"},
+            {"role": "assistant", "content": "Thats awesome, what do you want to know aboout AI"}
+        ]
+    return messages
 
 nodes = []
 edges = []
 
-nodes.append( Node(id="spiderman", 
+nodes.append( Node(id="Spiderman", 
                    label="Peter Parker", 
-                   size=15
-                   ) 
+                   size=25, 
+                   shape="circularImage",
+                   image="http://marvel-force-chart.surge.sh/marvel_force_chart_img/top_spiderman.png") 
             ) # includes **kwargs
-nodes.append( Node(id="captain_marvel", 
-                   label="Captain Marvel",
-                   size=15
-                    ) 
+nodes.append( Node(id="Captain_Marvel", 
+                   size=25,
+                   shape="circularImage",
+                   image="http://marvel-force-chart.surge.sh/marvel_force_chart_img/top_captainmarvel.png") 
             )
-edges.append( Edge(source="captain_marvel", 
+edges.append( Edge(source="Captain_Marvel", 
                    label="friend_of", 
-                   target="spiderman", 
+                   target="Spiderman", 
+                   # **kwargs
                    ) 
-            )
+            ) 
+
+config = Config(width=750,
+                height=950,
+                directed=True, 
+                physics=True, 
+                hierarchical=False,
+                # **kwargs
+                )
+
 
 user_secret = os.getenv("OPENAI_API_KEY")
 
@@ -76,8 +92,7 @@ bar = st.progress(0)
 
 # =========== SIDEBAR FOR GENERATION ===========
 with st.sidebar:
-    youtube_link = st.text_input(label = "Type in your Youtube link",
-                                placeholder = "")
+    youtube_link = st.text_input(label = "Type in your Youtube link", placeholder = "", key="url")
     st.markdown("OR")
     pdf_file = st.file_uploader("Upload your PDF", type="pdf")
     st.markdown("OR")
@@ -100,6 +115,9 @@ with st.sidebar:
             vte = VideoTranscription(youtube_link)
             YOUTUBE_VIDEO_ID = youtube_link.split("=")[1]
             folder_name = f"./tests/{YOUTUBE_VIDEO_ID}"
+            if not os.path.exists(folder_name):
+                os.mkdir(folder_name)
+            
             with st.spinner('Running process...'):
                 data_transcription = vte.transcribe()                    
                 segments = data_transcription['segments']
@@ -111,6 +129,8 @@ with st.sidebar:
         elif pdf_file is not None:
             pte = PDFTranscription(pdf_file)
             folder_name = pte.get_redacted_name()
+            if not os.path.exists(folder_name):
+                os.mkdir(folder_name)
             
             with st.spinner('Running process...'):
                 data_transcription = pte.transcribe()
@@ -120,6 +140,8 @@ with st.sidebar:
         elif audio_file is not None:
             ate = AudioTranscription(audio_file)
             folder_name = ate.get_redacted_name()
+            if not os.path.exists(f""):
+                os.mkdir(folder_name)
             
             with st.spinner('Running process...'):
                 data_transcription = ate.transcribe()
@@ -131,6 +153,10 @@ with st.sidebar:
         else:
             st.error("Please type in your youtube link or upload the PDF")  
             st.experimental_rerun()
+           
+        # Save the transcript information
+        with open(f"{folder_name}/data_transcription.json", "w") as f:
+            json.dump(data_transcription, f, indent=4)
             
         # Generate embeddings
         if not os.path.exists(f"{folder_name}/word_embeddings.csv"):
@@ -192,7 +218,6 @@ with st.sidebar:
         is_completed_analysis = True
         bar.progress(100)
 
-
 if is_completed_analysis:
     st.header("Key Takeaways")
     st.write("Here are some of the key takeaways from the data:")
@@ -200,124 +225,10 @@ if is_completed_analysis:
         st.markdown(f"- {takeaway}")
 
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Keywords", "Q&A"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Introduction", "Summary", "Transcription", "Mind Map", "Keywords", "Q&A"])
 
-    # =========== INTRODUCTION ===========
-    with tab1:
-        st.markdown("## Please reach to me on Discord to report any bugs (lordvader31#1368) ")
-
-    # =========== SUMMARIZATION ===========
-    with tab2: 
-        if is_completed_analysis:
-            st.header("TL;DR")
-            for point in tldr:
-                st.markdown(f"- {point}")
-            st.header("Summary")
-            st.write(summary)
-        else:
-            st.warning("Please wait for the analysis to finish")
-
-    # =========== TRANSCRIPTION ===========
-    with tab3:
-        if is_completed_analysis:
-            st.header("Transcription")
-            with st.spinner("Generating transcript ..."):
-                st.write("")
-                for text in text_chunks_lib[title_entry]:
-                    st.write(text)
-        else:
-            st.warning("Please wait for the analysis to finish")
-
-    # =========== MIND MAP ===========
-    with tab4:
-        st.header("Mind Map")
-        if is_completed_analysis:
-            return_value = agraph(nodes=nodes, 
-                                edges=edges, 
-                                config=config)
-        else:
-            st.warning("Please wait for the analysis to finish")
-
-    # =========== KEYWORDS ===========
-    with tab5:
-        st.header("Keywords:")
-        if is_completed_analysis:
-            for i, keyword in enumerate(keywords):
-                st.markdown(f"{i+1}. {keyword}")
-        else:
-            st.warning("Please wait for the analysis to finish")
-
-    # =========== QUERY BOT ===========
-    with tab6:
-        if 'generated' not in st.session_state:
-            st.session_state['generated'] = []
-
-        if 'past' not in st.session_state:
-            st.session_state['past'] = []
-
-        def get_text():
-            st.header("Ask me something about the video:")
-            input_text = st.text_input("You: ","", key="input")
-            return input_text
-        
-        user_input = get_text()
-
-        def get_embedding_text(prompt):
-            response = openai.Embedding.create(
-                input= prompt.strip(),
-                model="text-embedding-ada-002"
-            )
-            q_embedding = response['data'][0]['embedding']
-            df = pd.read_csv(f'{folder_name}/word_embeddings.csv', index_col=0)
-            df['embedding'] = df['embedding'].apply(eval).apply(np.array)
-
-            df['distances'] = distances_from_embeddings(q_embedding, df['embedding'].values, distance_metric='cosine')
-            returns = []
-            
-            # Sort by distance with 2 hints
-            for i, row in data.sort_values('distances', ascending=True).head(4).iterrows():
-                # Else add it to the text that is being returned
-                returns.append(row["text"])
-
-            # Return the context
-            return "\n\n###\n\n".join(returns)
-
-        def generate_response(prompt):
-            one_shot_prompt = '''
-                I am YoutubeGPT, a highly intelligent question answering bot.
-                If you ask me a question that is rooted in truth, I will give you the answer.
-                Q: What is human life expectancy in the United States?
-                A: Human life expectancy in the United States is 78 years.
-                Q: '''+prompt+'''
-                A: 
-            '''
-            
-            completions = openai.Completion.create(
-                engine = "text-davinci-003",
-                prompt = one_shot_prompt,
-                max_tokens = 1024,
-                n = 1,
-                stop=["Q:"],
-                temperature=0.5,
-            )
-            message = completions.choices[0].text
-            return message
-        
-        if user_input:
-            text_embedding = get_embedding_text(user_input)
-            with open(f'{folder_name}/data_transcription.json', "r") as f:
-                title = json.load(f)['title']
-            string_title = "\n\n###\n\n".join(title)
-            user_input_embedding = 'Using this context: "'+string_title+'. '+text_embedding+'", answer the following question. \n'+user_input
-            output = generate_response(user_input_embedding)
-            st.session_state.past.append(user_input)
-            st.session_state.generated.append(output)
-            
-        if st.session_state['generated']:
-            for i in range(len(st.session_state['generated'])-1, -1, -1):
-                message(st.session_state["generated"][i], key=str(i))
-                message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
-else:
+# =========== INTRODUCTION ===========
+with tab1:
     st.subheader("Introduction")
     st.markdown("## How do I use this?")
     st.markdown("Do one of the following")
@@ -327,5 +238,130 @@ else:
     st.warning("NOTE: This is just a demo product in alpha testing. Any and all bugs will soon be fixed")
     st.warning("After the note taking is done, you will see multiple tabs for more information")
 
+# =========== SUMMARIZATION ===========
+with tab2: 
+    if is_completed_analysis:
+        st.header("TL;DR")
+        for point in tldr:
+            st.markdown(f"- {point}")
+        st.header("Summary")
+        st.write(summary)
+    else:
+        st.warning("Please wait for the analysis to finish")
+
+# =========== TRANSCRIPTION ===========
+with tab3:
+    st.header("Transcription")
+    if is_completed_analysis:
+        with st.spinner("Generating transcript ..."):
+            st.write("")
+            for text in text_chunks_lib[title_entry]:
+                st.write(text)
+    else:
+        st.warning("Please wait for the analysis to finish")
+
+# =========== MIND MAP ===========
+with tab4:
+    st.header("Mind Map")
+    if is_completed_analysis:
+        mindmap = MindMap()
+        mindmap.generate_graph(text_chunks_lib)
+    else:
+        st.warning("Please wait for the analysis to finish")
+
+# =========== KEYWORDS ===========
+with tab5:
+    st.header("Keywords:")
+    if is_completed_analysis and gen_keywords:
+        for i, keyword in enumerate(keywords):
+            st.markdown(f"{i+1}. {keyword}")
+    else:
+        st.warning("Please wait for the analysis to finish")
+
+# =========== QUERY BOT ===========
+with tab6:  
+    if 'generated' not in st.session_state:
+        st.session_state['generated'] = []
+
+    if 'past' not in st.session_state:
+        st.session_state['past'] = []
+
+    def get_text():
+        st.header("Ask me something about the video:")
+        input_text = st.text_input("You: ", key="prompt")
+        return input_text
+
+
+    def get_embedding_text(prompt):
+        response = openai.Embedding.create(
+            input= prompt.strip(),
+            model="text-embedding-ada-002"
+        )
+        q_embedding = response['data'][0]['embedding']
+        print("the folder name at got here 1.5 is ", folder_name)
+        df = pd.read_csv(f'{folder_name}/word_embeddings.csv', index_col=0)
+        df['embedding'] = df['embedding'].apply(eval).apply(np.array)
+
+        df['distances'] = distances_from_embeddings(q_embedding, df['embedding'].values, distance_metric='cosine')
+        returns = []
+        
+        # Sort by distance with 2 hints
+        for i, row in df.sort_values('distances', ascending=True).head(4).iterrows():
+            # Else add it to the text that is being returned
+            returns.append(row["text"])
+
+        # Return the context
+        return "\n\n###\n\n".join(returns)
+
+    def generate_response(prompt):
+        one_shot_prompt = '''
+            I am YoutubeGPT, a highly intelligent question answering bot.
+            If you ask me a question that is rooted in truth, I will give you the answer.
+            Q: What is human life expectancy in the United States?
+            A: Human life expectancy in the United States is 78 years.
+            Q: '''+prompt+'''
+            A: 
+        '''
+        completions = openai.Completion.create(
+            engine = "text-davinci-003",
+            prompt = one_shot_prompt,
+            max_tokens = 1024,
+            n = 1,
+            stop=["Q:"],
+            temperature=0.5,
+        )
+        message = completions.choices[0].text
+        return message
     
-                    
+    if is_completed_analysis:
+        user_input = get_text()
+        print("user input is ", user_input)
+        print("the folder name at got here 0.5 is ", folder_name)
+    else:
+        user_input = None
+    
+    if 'messages' not in st.session_state:
+        st.session_state['messages'] = get_initial_message()
+    
+    if user_input:
+        print("got here 1")
+        print("the folder name at got here 1.5 is ", folder_name)
+        text_embedding = get_embedding_text(user_input)
+        print("the folder name at got here 1.5 is ", folder_name)
+        print("got here 2")
+        with open(f'{folder_name}/data_transcription.json', "r") as f:
+            title = json.load(f)['title']
+        string_title = "\n\n###\n\n".join(title)
+        user_input_embedding = 'Using this context: "'+string_title+'. '+text_embedding+'", answer the following question. \n'+user_input
+        print("got here 3")
+        output = generate_response(user_input_embedding)
+        st.session_state.past.append(user_input)
+        st.session_state.generated.append(output)
+        
+    if st.session_state['generated']:
+        for i in range(len(st.session_state['generated'])-1, -1, -1):
+            message(st.session_state["generated"][i], key=str(i))
+            message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
+
+
+# st.header("What else")

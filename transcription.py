@@ -57,7 +57,7 @@ class DownloadAudio:
                 self.yt = YouTube(self.link)
                 continue
 
-    def download(self, pathname:str) -> list:
+    def download(self, pathname:str):
         """
         Download the audio from the youtube video and saves it to multiple .wav files
         in the specified folder. Returns a list of the paths to the .wav files.
@@ -86,7 +86,7 @@ class DownloadAudio:
         # If the total duration is less than the duration of each segment,
         # then just return the original file
         if total_byte_size < MAX_FILE_SIZE_BYTES:
-            return [FINAL_WAV_PATH]
+            return FINAL_WAV_PATH
 
         # Get the size of the wav file
         channels = audio.channels
@@ -109,7 +109,7 @@ class DownloadAudio:
             chunk_names.append(output_chunk_path)
             chunk.export(f"{output_chunk_path}", format="wav")
         
-        return chunk_names, FINAL_WAV_PATH
+        return FINAL_WAV_PATH
 
 
 class VideoTranscription:
@@ -143,12 +143,13 @@ class VideoTranscription:
         audio_file = DownloadAudio(self.datalink)
 
         # Get the names of the stored wav files
-        file_names, original_file_name = audio_file.download(FOLDER_NAME)
+        original_file_name = audio_file.download(FOLDER_NAME)
+        print(original_file_name)
         # Get the transcription of each audio chunk
         text_transcriptions = ""
         # for file_name in file_names:
         # Get the transcription
-        chunk_segments, info = self.model.transcribe(original_file_name, beam_size=5)
+        chunk_segments, _ = self.model.transcribe(original_file_name, beam_size=5)
         for chunk_segment in chunk_segments:
             text_transcriptions += chunk_segment.text.replace("$", "\$")    
 
