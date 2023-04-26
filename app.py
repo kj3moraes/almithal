@@ -265,7 +265,8 @@ with tab4:
     st.header("Mind Map")
     if is_completed_analysis:
         mindmap = MindMap()
-        mindmap.generate_graph(text_chunks_lib)
+        with st.spinner("Generating mind map..."):
+            mindmap.generate_graph(text_chunks_lib)
     else:
         st.warning("Please wait for the analysis to finish")
 
