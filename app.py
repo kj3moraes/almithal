@@ -68,7 +68,6 @@ nodes.append( Node(id="Captain_Marvel",
 edges.append( Edge(source="Captain_Marvel", 
                    label="friend_of", 
                    target="Spiderman", 
-                   # **kwargs
                    ) 
             ) 
 
@@ -77,7 +76,6 @@ config = Config(width=750,
                 directed=True, 
                 physics=True, 
                 hierarchical=False,
-                # **kwargs
                 )
 
 
