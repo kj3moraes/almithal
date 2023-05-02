@@ -1,4 +1,6 @@
 bentoml==1.0.18
+faster-whisper
+graphviz
 keybert==0.7.0
 moviepy==1.0.3
 nltk==3.8.1
