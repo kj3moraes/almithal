@@ -4,7 +4,9 @@ from moviepy.editor import *
 from pydub import AudioSegment
 from pydub.utils import make_chunks
 import pydub
+from yt_dlp import YoutubeDL
 from pathlib import Path
+import subprocess
 
 # For getting text from PDF
 from zipfile import ZipFile
@@ -41,23 +43,17 @@ class DownloadAudio:
 
     def __init__(self, link) -> None:
         self.link = link
-        self.yt = YouTube(self.link)
+        with YoutubeDL() as ydl:
+            self.yt = ydl.extract_info(self.link, download=False)
+            
         self.YOUTUBE_VIDEO_ID = link.split("=")[1]
         self.WAV_FILE_NAME = f"{self.YOUTUBE_VIDEO_ID}.wav"
 
     def get_yt_title(self) -> str:
         """Returns the title of the youtube video"""
-        while True:
-            try:
-                title = self.yt.title
-                return title
-            except:
-                print("Failed to get name. Retrying...")
-                time.sleep(1)
-                self.yt = YouTube(self.link)
-                continue
+        return self.yt["title"]
 
-    def download(self, pathname:str):
+    def download(self, pathname:str) -> str:
         """
         Download the audio from the youtube video and saves it to multiple .wav files
         in the specified folder. Returns a list of the paths to the .wav files.
@@ -69,14 +65,25 @@ class DownloadAudio:
         FINAL_WAV_PATH = f"{pathname}/{self.WAV_FILE_NAME}"
 
         if not os.path.exists(FINAL_WAV_PATH):
-            # Download the .mp4 file
-            audiostream = self.yt.streams.filter(only_audio=True).first()
-            outfile_path = audiostream.download(pathname)
+            print("\n\n\n DOWNLOADING AUDIO \n\n\n")
+            current_dir = os.getcwd()
+            print(current_dir)
+            executable_path = os.path.join(current_dir, "exec/yt-dlp_linux")
+            
+            # Download the video as an audio file using youtube-dl
+            original_download_path = f"{pathname}/audio.wav"
+            result = subprocess.run([executable_path, "-x", "--audio-format", "wav", "-o", original_download_path, self.link])
+            if result.returncode != 0:
+                print("Failed to download audio. Retrying...")
+                return "FAILED"
 
-            # Convert the .mp4 file to .wav
-            wav_file = AudioFileClip(outfile_path)
-            wav_file.write_audiofile(FINAL_WAV_PATH, bitrate="16k", fps=16000)
-
+            sound = AudioSegment.from_wav(original_download_path)
+            sound.set_channels(1)
+            sound = sound.set_frame_rate(16000)                
+            sound = sound.set_channels(1)    
+            sound.export(FINAL_WAV_PATH, format="wav")
+            os.remove(original_download_path)
+            
         # Load the input .wav file
         audio = AudioSegment.from_wav(FINAL_WAV_PATH)
     
@@ -88,26 +95,26 @@ class DownloadAudio:
         if total_byte_size < MAX_FILE_SIZE_BYTES:
             return FINAL_WAV_PATH
 
-        # Get the size of the wav file
-        channels = audio.channels
-        sample_width = audio.sample_width
-        duration_in_sec = math.ceil(len(audio) / 1000)
-        sample_rate = audio.frame_rate
-        bit_rate = sample_width * 8
-        wav_file_size = (sample_rate * bit_rate * channels * duration_in_sec) / 8
+        # # Get the size of the wav file
+        # channels = audio.channels
+        # sample_width = audio.sample_width
+        # duration_in_sec = math.ceil(len(audio) / 1000)
+        # sample_rate = audio.frame_rate
+        # bit_rate = sample_width * 8
+        # wav_file_size = (sample_rate * bit_rate * channels * duration_in_sec) / 8
 
-        # Get the length of each chunk in milliseconds and make the chunks
-        chunk_length_in_sec = math.ceil((duration_in_sec * MAX_FILE_SIZE_BYTES ) / wav_file_size)   #in sec
-        chunk_length_ms = chunk_length_in_sec * 1000
-        chunks = make_chunks(audio, chunk_length_ms)
+        # # Get the length of each chunk in milliseconds and make the chunks
+        # chunk_length_in_sec = math.ceil((duration_in_sec * MAX_FILE_SIZE_BYTES ) / wav_file_size)   #in sec
+        # chunk_length_ms = chunk_length_in_sec * 1000
+        # chunks = make_chunks(audio, chunk_length_ms)
 
-        # Export all of the individual chunks as wav files
-        chunk_names = []
-        for i, chunk in enumerate(chunks):
-            chunk_name = f"{self.YOUTUBE_VIDEO_ID}_{i}.wav"
-            output_chunk_path = f"{pathname}/{chunk_name}"
-            chunk_names.append(output_chunk_path)
-            chunk.export(f"{output_chunk_path}", format="wav")
+        # # Export all of the individual chunks as wav files
+        # chunk_names = []
+        # for i, chunk in enumerate(chunks):
+        #     chunk_name = f"{self.YOUTUBE_VIDEO_ID}_{i}.wav"
+        #     output_chunk_path = f"{pathname}/{chunk_name}"
+        #     chunk_names.append(output_chunk_path)
+        #     chunk.export(f"{output_chunk_path}", format="wav")
         
         return FINAL_WAV_PATH
 

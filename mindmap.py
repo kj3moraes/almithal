@@ -33,10 +33,8 @@ class MindMap:
                 relationships = response.choices[0].text
                 final_string = '{"relations":' + relationships + '}'
                 data = json.loads(final_string)
-                print(data)
                 relations = data["relations"]
                 final_connections.extend(relations)
-                print(final_connections)
         return final_connections
             
         
